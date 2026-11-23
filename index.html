@@ -837,6 +837,10 @@ function initDirect() {
     }
     redrawSoon();
   });
+  // clicking anywhere outside the picture drops the selection
+  document.addEventListener("pointerdown", e => {
+    if (sel.what && e.target !== cv) { sel.what = null; drawOverlay(); }
+  });
   const stop = () => { drag = null; };
   cv.addEventListener("pointerup", stop);
   cv.addEventListener("pointercancel", stop);
