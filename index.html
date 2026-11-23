@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>豪老師梗圖產生器</title>
+<style>
+/* Glow Sans TC Extended Heavy (SIL OFL), https://github.com/welai/glow-sans */
+@font-face { font-family: "Hao Title"; src: url("fonts/GlowSansTC-Extended-Heavy.otf") format("opentype"); font-weight: 900; font-display: block; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #141416; color: #eee; font: 15px/1.5 "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  fieldset { border: 1px solid #333; border-radius: 8px; margin: 0 0 12px; padding: 10px 12px 12px; }
+  legend { padding: 0 6px; color: #ffd400; font-weight: 700; }
+  label { display: block; margin-top: 6px; }
+  .row { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .row > input[type=text] { flex: 1; min-width: 0; }
+  input[type=text], select { background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; padding: 7px 8px; font: inherit; }
+  input[type=range] { width: 100%; }
+  button { background: #2a2a2e; color: #fff; border: 1px solid #555; border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #38383e; }
+  button.primary { background: #d8121c; border-color: #d8121c; font-weight: 700; }
+  button.primary:hover { background: #f01a25; }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .thumbs button { padding: 0; height: 70px; overflow: hidden; background: #3a0508; }
+  .thumbs button.on { outline: 3px solid #ffd400; }
+  .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; }
+  .seg button.on { background: #ffd400; color: #000; border-color: #ffd400; font-weight: 700; }
+  canvas { width: 100%; height: auto; border-radius: 8px; background: #000; display: block; }
+  .stage { position: relative; }
+  #cv { touch-action: none; }
+  #ov { position: absolute; inset: 0; height: 100%; background: none; pointer-events: none; }
+  /* text box: a transparent textarea over a mirror that shows the colours */
+  .ed-wrap { position: relative; margin-top: 6px; }
+  #ed, #edMirror { font: 700 20px/1.5 "Noto Sans TC", "Microsoft JhengHei", sans-serif; padding: 8px 10px; margin: 0;
+                   white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: 0; border: 1px solid #444; border-radius: 6px; }
+  #ed { position: relative; z-index: 1; display: block; width: 100%; min-height: 84px; resize: none; overflow: hidden;
+        background: transparent; color: transparent; caret-color: #fff; }
+  #ed::selection { background: rgba(70, 150, 255, .45); color: transparent; }
+  #edMirror { position: absolute; inset: 0; overflow: hidden; background: #222; pointer-events: none; }
+  .k-white { color: #fff; } .k-yellow { color: #ffe600; } .k-red { color: #ff4048; }
+  .colors button { min-width: 44px; font-weight: 700; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  #msg { color: #9c9; }
+  small { color: #999; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>豪老師梗圖產生器</h1>
+
+    <fieldset>
+      <legend>版型</legend>
+      <div class="seg" id="tpl">
+        <button data-v="teach">教育我了？</button>
+        <button data-v="crash">翻車了？</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>大字</legend>
+      <div class="ed-wrap">
+        <div id="edMirror" aria-hidden="true"></div>
+        <textarea id="ed" spellcheck="false" aria-label="大字內容"></textarea>
+      </div>
+      <div class="row colors">
+        <span style="flex:1">選取文字後上色</span>
+        <button data-c="white" class="k-white">白</button>
+        <button data-c="yellow" class="k-yellow">黃</button>
+        <button data-c="red" class="k-red">紅</button>
+      </div>
+      <small>按 Enter 換行，每一行會自動放大到排得下的大小。沒選取文字時，上色會套用到游標所在的那一行。</small>
+      <label><input type="checkbox" id="brush" checked> 紅色筆刷</label>
+      <label>字體大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
+      <label>旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>人像</legend>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="row">
+        <button id="rand">隨機換一張</button>
+        <button id="upBtn">上傳自己的</button>
+        <input type="file" id="up" accept="image/*" hidden>
+      </div>
+      <div class="row">
+        <span>位置</span>
+        <div class="seg" id="side" style="flex:1">
+          <button data-v="left">左</button>
+          <button data-v="right">右</button>
+        </div>
+        <label style="margin:0"><input type="checkbox" id="flip"> 翻轉</label>
+      </div>
+      <label>大小 <input type="range" id="psize" min="30" max="260" value="100"></label>
+      <div class="row"><button id="resetPos">位置與大小重設</button></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>背景</legend>
+      <div class="row">
+        <button id="bgBtn">上傳背景圖</button>
+        <button id="bgClear">用預設</button>
+        <input type="file" id="bg" accept="image/*" hidden>
+      </div>
+      <label>大小 <input type="range" id="bsize" min="30" max="300" value="100"></label>
+      <small>沒上傳時：「教育我了？」是紅黑漸層，「翻車了？」是暗色底。點文字和人像以外的地方就能選到背景。</small>
+    </fieldset>
+  </section>
+
+  <section>
+    <div class="stage">
+      <canvas id="cv" width="1280" height="720"></canvas>
+      <canvas id="ov" width="1280" height="720"></canvas>
+    </div>
+    <p><small>直接在圖上操作：點一下選取文字、人像或背景，拖曳移動；拉四個角的圓點或滾滑鼠滾輪縮放；文字上方的藍色圓點可以旋轉；方向鍵微調，Esc 取消選取；雙擊文字可改字。</small></p>
+    <div class="actions">
+      <button class="primary" id="dl">下載 PNG</button>
+      <button id="copy">複製圖片</button>
+      <span id="msg"></span>
+    </div>
+    <p><small>輸出 1280×720。人像取自「拆書人」頻道原始封面，僅供私下玩梗，不要拿去冒充本人發文。</small></p>
+  </section>
+</main>
+
+<script src="portraits.js"></script>
+<script>
+"use strict";
+const W = 1280, H = 720;
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const $ = id => document.getElementById(id);
+const FONT = '"Hao Title", "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif';
+
+// tx/ty, pdx/pdy and bgx/bgy are how far the text block, the portrait and the
+// background were dragged from their default spots; textQuad is where the text
+// block landed on screen and textPivot the point it rotates around.
+// text is the headline (lines split by \n); cols holds one colour per character.
+const state = { tpl: "teach", portrait: 0, side: "left", custom: null, bg: null, imgs: [],
+                tx: 0, ty: 0, pdx: 0, pdy: 0, bgx: 0, bgy: 0, textQuad: null, textPivot: null,
+                text: "", cols: [] };
+
+// ---------- deterministic random (so the brush doesn't flicker on redraw) ----------
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// ---------- backgrounds ----------
+function coverImage(img, blur) {
+  const r = Math.max(W / img.width, H / img.height) * 1.06;
+  const w = img.width * r, h = img.height * r;
+  ctx.save();
+  if (blur) ctx.filter = `blur(${blur}px)`;
+  ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  ctx.restore();
+}
+
+// the background as a box that can be moved and scaled like the other pieces
+function bgBox() {
+  const k = $("bsize").value / 100, w = W * k, h = H * k;
+  return { x: W / 2 + state.bgx - w / 2, y: H / 2 + state.bgy - h / 2, w, h, k };
+}
+
+function drawBackdrop(personCx) {                     // drawn in a W x H space
+  if (state.bg) { coverImage(state.bg, state.tpl === "crash" ? 5 : 0); return; }
+  if (state.tpl === "teach") {
+    ctx.fillStyle = "#0b0b0c"; ctx.fillRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(personCx, 250, 40, personCx, 300, 640);
+    g.addColorStop(0, "#ff1616"); g.addColorStop(.28, "#d40b10"); g.addColorStop(.55, "#6a0508");
+    g.addColorStop(.8, "#1c0a0b"); g.addColorStop(1, "#0b0b0c");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#5c6b78"); g.addColorStop(.5, "#27323d"); g.addColorStop(1, "#0d1218");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // soft light blobs, like an out-of-focus room
+    const r = rng(7);
+    for (let i = 0; i < 16; i++) {
+      const x = r() * W, y = r() * H, rad = 60 + r() * 160;
+      const b = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      b.addColorStop(0, `rgba(${150 + r() * 80},${180 + r() * 60},255,${.05 + r() * .09})`);
+      b.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = b; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+  }
+}
+
+function drawBackground(personCx) {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);  // shows wherever the background was moved away
+  const b = bgBox();
+  ctx.save();
+  ctx.translate(b.x, b.y); ctx.scale(b.k, b.k);
+  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  drawBackdrop(personCx);
+  ctx.restore();
+  // shading that belongs to the frame, not to the background, so it stays put
+  if (state.bg) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,.15)"); g.addColorStop(1, "rgba(0,0,0,.45)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else {
+    const v = ctx.createRadialGradient(W / 2, H / 2, 380, W / 2, H / 2, 800);
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ---------- portrait ----------
+function currentPortrait() {
+  return state.custom || state.imgs[state.portrait];
+}
+
+// The built-in portraits were widened so both shoulders exist (for flipping).
+// `anchor` is where the original cutout sits inside the widened image: the
+// portrait is sized and placed by that box, so by default the extra shoulder
+// runs off the frame edge just like the original cut did.
+function portraitBox() {
+  const img = currentPortrait();
+  if (!img || !img.naturalWidth) return null;        // not loaded yet
+  const meta = state.custom ? null : PORTRAITS[state.portrait];
+  const a = (meta && meta.anchor) || { x: 0, y: 0, w: img.width, h: img.height };
+  const scale = (H * 0.98 / a.h) * ($("psize").value / 100);
+  const w = img.width * scale, h = img.height * scale;
+  const ax = $("flip").checked ? img.width - a.x - a.w : a.x;   // box left edge as drawn
+  const dx = state.pdx, dy = state.pdy;
+  const x = state.side === "left" ? -ax * scale + dx : W - (ax + a.w) * scale + dx;
+  return { img, x, y: H - (a.y + a.h) * scale + dy, w, h };
+}
+
+function drawPortrait(b) {
+  if (!b) return;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 12;
+  if ($("flip").checked) {
+    ctx.translate(b.x + b.w, b.y); ctx.scale(-1, 1);
+    ctx.drawImage(b.img, 0, 0, b.w, b.h);
+  } else {
+    ctx.drawImage(b.img, b.x, b.y, b.w, b.h);
+  }
+  ctx.restore();
+}
+
+// ---------- red brush ----------
+// The stroke is computed pixel by pixel instead of drawn as a path: a smooth
+// body shape, multiplied by a "paint coverage" test against streaky noise
+// (noise stretched far along the stroke and squeezed across it). Where the
+// brush runs dry (the tail, the rims, the very start) the test fails more
+// often, so the paint breaks up into bristle lines the way a real stroke does.
+function hash2(i, j, seed) {
+  let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(seed, 982451653);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x, y, seed) {                          // smooth value noise, 0..1
+  const xi = Math.floor(x), yi = Math.floor(y);
+  let fx = x - xi, fy = y - yi;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  const a = hash2(xi, yi, seed), b = hash2(xi + 1, yi, seed);
+  const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const sstep = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+const scratch = document.createElement("canvas");
+// taper=true: underline swoosh, blunt forked head at (0,0), sweeping up and
+// thinning to hairs at (len, -rise). taper=false: a flat band with torn ends.
+function brush(len, thick, seed, taper) {
+  const padX = Math.ceil(len * .1) + 6, padY = Math.ceil(thick * (taper ? 2.2 : 1)) + 8;
+  const cw = Math.ceil(len + padX * 2), ch = Math.ceil(thick + padY * 2);
+  scratch.width = cw; scratch.height = ch;
+  const g = scratch.getContext("2d");
+  const img = g.createImageData(cw, ch), px = img.data;
+  const half0 = thick / 2, rise = thick * 1.05, oy = taper ? ch - padY - half0 : ch / 2;
+
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+    const u = x - padX, t = u / len;
+    if (t < -.08 || t > 1.08) continue;
+    const tc = clamp01(t);
+    let mid, half;
+    if (taper) {
+      mid = -rise * (1 - Math.pow(1 - tc, 2.1));       // rises fast, then levels off
+      half = half0 * Math.min(1, Math.pow(tc / .09, .55)) * Math.pow(1 - tc, .85) * 1.3;
+      if (half > half0) half = half0;
+      if (t > .9) half = Math.max(half, 1.3);           // a few hairs run past the tip
+    } else { mid = 0; half = half0; }
+    const dy = (y - oy) - mid, ady = Math.abs(dy);
+    // slightly wobbly rim
+    const rim = half * (1 + .07 * (vnoise(u * .05, dy > 0 ? 3.5 : 9.5, seed) - .5) * 2)
+              + (vnoise(u * .35, dy > 0 ? 1.5 : 6.5, seed + 1) - .5) * 1.6;
+    let a = clamp01(rim - ady + .5);
+    if (a > 0) {
+      const e = ady / Math.max(half, .01);              // 0 centre .. 1 rim
+      const streak = .62 * vnoise(u / 75, dy / 2.1, seed + 2) + .38 * vnoise(u / 24, dy / 1.05 + 40, seed + 3);
+      let dry;
+      if (taper) {
+        dry = -.3 + 1.1 * Math.pow(tc, 2.6) + .85 * sstep(.62, 1, e) * (.2 + tc)
+            + (t < .07 ? (1 - t / .07) * .8 : 0) + (t > 1 ? (t - 1) * 9 : 0);
+      } else {
+        const ends = Math.max(sstep(.16, -.06, t), sstep(.82, 1.06, t));
+        dry = -.3 + 1.25 * ends + .6 * sstep(.72, 1, e) + .12 * sstep(.3, .7, vnoise(u / 140, dy / 9, seed + 4));
+      }
+      a *= sstep(dry - .035, dry + .035, streak);
+    }
+    // stray bristle lines that travel alongside the body
+    let extra = 0;
+    if (taper) {
+      if (t > .33 && t < 1.04) {                        // hairline riding above the body
+        const off = -(half + 2.6 + 2.5 * tc);
+        extra = clamp01(1.5 - Math.abs(dy - off)) * sstep(.3, .4, vnoise(u / 55, 3.3, seed + 5));
+      }
+      if (t > .2 && t < .64) {                          // broken flecks under the belly
+        const off = half + 2.8;
+        extra = Math.max(extra, clamp01(1.25 - Math.abs(dy - off)) * sstep(.52, .6, vnoise(u / 22, 9.1, seed + 6)));
+      }
+    } else if (ady > half) {
+      const row = Math.floor((ady - half) / 3.2), inRow = ((ady - half) % 3.2);
+      if (row < 4 && inRow < 1.6) {
+        const k = (dy > 0 ? 20 : 60) + row * 7.7;
+        extra = sstep(.56 + row * .05, .62 + row * .05, vnoise(u / 90 + k, k, seed + 7))
+              * sstep(.3, .5, vnoise(u / 18, k + 5, seed + 8));
+      }
+    }
+    if (extra > a) a = extra;
+    if (a <= 0) continue;
+    const i = (y * cw + x) * 4;
+    px[i] = 243; px[i + 1] = 13; px[i + 2] = 20; px[i + 3] = Math.round(a * 255);
+  }
+  g.putImageData(img, 0, 0);
+  ctx.drawImage(scratch, -padX, -oy);
+}
+
+// ---------- text ----------
+function fillFor(color, top, size) {
+  if (color === "white") return "#fff";
+  const g = ctx.createLinearGradient(0, top, 0, top + size);
+  if (color === "yellow") {
+    if (state.tpl === "teach") {                        // near-flat lemon yellow
+      g.addColorStop(0, "#fff533"); g.addColorStop(1, "#ffe600");
+    } else {                                           // yellow melting into orange
+      g.addColorStop(0, "#fff36b"); g.addColorStop(.45, "#ffe600"); g.addColorStop(.8, "#ffc800"); g.addColorStop(1, "#ff9500");
+    }
+  } else {
+    g.addColorStop(0, "#ff5a4a"); g.addColorStop(.5, "#f3101c"); g.addColorStop(1, "#b00008");
+  }
+  return g;
+}
+
+const TALL = 1.14;   // glyphs are stretched vertically, like the condensed look of the originals
+
+// Dry-brush scratches for the "crash" lettering: thin diagonal streaks where
+// the paint is missing, so the black underneath shows through the colour.
+const layer = document.createElement("canvas");
+layer.width = W; layer.height = H;
+const lctx = layer.getContext("2d");
+const layer2 = document.createElement("canvas");    // holds the scratch marks before they are cut out
+layer2.width = W; layer2.height = H;
+const l2 = layer2.getContext("2d");
+const layer3 = document.createElement("canvas");    // the letters shrunk inward: their "core"
+layer3.width = W; layer3.height = H;
+const l3 = layer3.getContext("2d");
+// Short, grainy streaks running along x: dry bristles dragged across the paint.
+let streakPat = null;
+function streakPattern() {
+  if (streakPat) return streakPat;
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 512;
+  const g = c.getContext("2d"), img = g.createImageData(c.width, c.height), d = img.data;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const streak = .55 * vnoise(x / 20, y / 1.4, 81) + .3 * vnoise(x / 8, y / 1.0 + 30, 82)
+                 + .15 * vnoise(x / 3, y / 1.2 + 70, 83) + (hash2(x, y, 84) - .5) * .1;
+    const patch = vnoise(x / 60, y / 22, 85);
+    d[(y * c.width + x) * 4 + 3] = 255 * sstep(.755, .77, streak) * sstep(.6, .72, patch);
+  }
+  g.putImageData(img, 0, 0);
+  return streakPat = lctx.createPattern(c, "repeat");
+}
+
+// pass "cloud": black that fades out around the letters.
+// pass "ink": outline, hard drop shadow and the coloured fill.
+// line: { text, size, width, runs: [{ text, color, start }] } (start = index in text)
+function drawLine(line, cx, top, pass) {
+  const { text, size } = line;
+  ctx.save();
+  ctx.translate(cx, top); ctx.scale(1, TALL);
+  ctx.font = `900 ${size}px ${FONT}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.lineJoin = "round"; ctx.miterLimit = 2;
+  const bold = size * .012;                            // extra weight added around the glyphs
+  const crashTpl = state.tpl === "crash";
+  const sw = size * (crashTpl ? .115 : .075) + bold;   // outline width
+  const sh = Math.max(4, size * .05);                  // hard shadow drop
+  if (pass === "cloud") {
+    // Same recipe as a layer-style "outer glow with spread": the outline is
+    // redrawn many times, each a little wider and fainter, so the black is
+    // solid at the letter and thins out to nothing at a fixed distance.
+    const reach = size * (crashTpl ? .13 : .3), steps = 18;
+    ctx.strokeStyle = "#000";
+    ctx.filter = `blur(${Math.max(1, size * .02)}px)`;
+    for (let i = 0; i < steps; i++) {
+      const k = (i + 1) / steps;                        // 0 near .. 1 far
+      ctx.globalAlpha = .1 + .12 * (1 - k);
+      ctx.lineWidth = sw + reach * 2 * k * k;
+      ctx.strokeText(text, -sh * .3, sh * .9);
+    }
+  } else {
+    // hard shadow: the outline smeared downward and a touch to the left
+    ctx.strokeStyle = "#000"; ctx.lineWidth = sw;
+    for (let i = sh; i >= 0; i -= 1.5) ctx.strokeText(text, -i * .35, i / TALL);
+    // each colour run is drawn from its own spot along the line
+    const left = -line.width / 2;
+    const runs = line.runs.map(r => ({ ...r, x: left + ctx.measureText(text.slice(0, r.start)).width, fill: fillFor(r.color, 0, size) }));
+    ctx.textAlign = "left";
+    for (const r of runs) if (r.color === "red") {      // red text gets a white rim
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = bold + sw * .5;
+      ctx.strokeText(r.text, r.x, 0);
+    }
+    if (state.tpl === "crash") {
+      // paint the letters on a spare canvas, scrape streaks out of them, then
+      // lay them over a black copy so the streaks read as bare patches
+      ctx.fillStyle = "#000";
+      for (const r of runs) ctx.fillText(r.text, r.x, 0);
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.globalCompositeOperation = "source-over";
+      lctx.clearRect(0, 0, W, H);
+      lctx.setTransform(ctx.getTransform());
+      lctx.font = ctx.font; lctx.textAlign = "left"; lctx.textBaseline = "top"; lctx.lineJoin = "round";
+      lctx.lineWidth = bold;
+      for (const r of runs) {
+        lctx.fillStyle = lctx.strokeStyle = r.fill;
+        lctx.strokeText(r.text, r.x, 0); lctx.fillText(r.text, r.x, 0);
+      }
+      // Bristle marks: short streaks that run along and across the strokes
+      // (not all one way), kept only in a thin band at the edge of the letters.
+      l2.setTransform(1, 0, 0, 1, 0, 0);
+      l2.globalCompositeOperation = "source-over";
+      l2.clearRect(0, 0, W, H);
+      l2.setTransform(ctx.getTransform());
+      for (const [ang, ox, oy] of [[.04, 0, 0], [1.54, 170, 60], [-.07, 330, 240], [1.62, 90, 410]]) {
+        l2.save();
+        l2.rotate(ang); l2.translate(ox, oy);
+        l2.fillStyle = streakPattern();
+        l2.fillRect(-4000, -4000, 8000, 8000);
+        l2.restore();
+      }
+      // The edge is measured on the finished letter shape, not on the font's
+      // outlines: this font draws each stroke as its own overlapping piece,
+      // so its outlines also run through the middle of the letters.
+      // Core = the letter shape shrunk by `edge` pixels (the overlap of
+      // copies shifted in every direction). Marks inside the core are dropped.
+      const edge = size * .03;
+      l3.setTransform(1, 0, 0, 1, 0, 0);
+      l3.globalCompositeOperation = "source-over";
+      l3.clearRect(0, 0, W, H);
+      l3.drawImage(layer, 0, 0);
+      l3.globalCompositeOperation = "destination-in";
+      for (let i = 0; i < 12; i++) {
+        const t = i * Math.PI / 6;
+        l3.drawImage(layer, Math.cos(t) * edge, Math.sin(t) * edge);
+      }
+      l2.setTransform(1, 0, 0, 1, 0, 0);
+      l2.globalCompositeOperation = "destination-out";
+      l2.drawImage(layer3, 0, 0);
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.globalCompositeOperation = "destination-out";
+      lctx.drawImage(layer2, 0, 0);
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(layer, 0, 0); ctx.restore();
+    } else {
+      ctx.lineWidth = bold;                            // fatten the letters: the originals use a heavier face
+      for (const r of runs) {
+        ctx.fillStyle = ctx.strokeStyle = r.fill;
+        ctx.strokeText(r.text, r.x, 0);
+        ctx.fillText(r.text, r.x, 0);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// full-width ？！ are a whole character wide; the originals use the narrow ones
+function halfPunct(t) { return t.replace(/？/g, "?").replace(/！/g, "!"); }
+
+// split the headline into lines, each cut into runs of one colour
+function textLines() {
+  const t = state.text, out = [];
+  let start = 0;
+  for (let i = 0; i <= t.length; i++) {
+    if (i < t.length && t[i] !== "\n") continue;
+    let a = start, b = i;
+    while (a < b && /\s/.test(t[a])) a++;
+    while (b > a && /\s/.test(t[b - 1])) b--;
+    if (b > a) {
+      const text = halfPunct(t.slice(a, b)), runs = [];
+      for (let j = a; j < b; j++) {
+        const c = state.cols[j] || "white", last = runs[runs.length - 1];
+        if (last && last.color === c) last.text += text[j - a];
+        else runs.push({ text: text[j - a], color: c, start: j - a });
+      }
+      out.push({ text, runs });
+    }
+    start = i + 1;
+  }
+  return out;
+}
+
+function drawText(area) {
+  const lines = textLines();
+  state.textQuad = null;
+  if (!lines.length) return;
+  const crash = state.tpl === "crash";
+  const user = $("tsize").value / 100;
+  const maxSize = (lines.length >= 3 ? 132 : 206) * user;
+  const availW = area.w * (crash ? .9 : 1);
+  for (const l of lines) {
+    ctx.font = `900 100px ${FONT}`;
+    const w = ctx.measureText(l.text).width || 1;
+    l.size = Math.min(maxSize, availW / w * 100 * user);
+    ctx.font = `900 ${l.size}px ${FONT}`;
+    l.width = ctx.measureText(l.text).width;
+  }
+  const gap = .08;
+  for (const l of lines) l.h = l.size * TALL;          // drawn height
+  let total = 0;
+  for (const l of lines) total += l.h * (1 + gap);
+  const cx = area.x + area.w / 2 + state.tx;
+  const brushOn = $("brush").checked;
+  const cy = H / 2 - (brushOn && !crash ? 25 : 0) + state.ty;
+
+  state.textPivot = [cx, cy];
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate($("trot").value * Math.PI / 180);         // the user's own rotation
+  // the lettering leans right and climbs toward the right edge
+  if (crash) { ctx.rotate(-6.5 * Math.PI / 180); ctx.transform(1, 0, -.1, 1, 0, 0); }
+  else { ctx.rotate(-2 * Math.PI / 180); ctx.transform(1, 0, -.13, 1, 0, 0); }
+  let y = -total / 2;
+  const tops = lines.map(l => { const t = y; y += l.h * (1 + gap); return t; });
+  const last = lines[lines.length - 1], lastTop = tops[tops.length - 1];
+  {                                                    // remember the block's outline for clicking and dragging
+    const m = ctx.getTransform(), hw = Math.max(...lines.map(l => l.width)) / 2 + 14;
+    const t = -total / 2 - 8, b = total / 2 + (brushOn && !crash ? last.h * .35 : 0);
+    state.textQuad = [[-hw, t], [hw, t], [hw, b], [-hw, b]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  }
+
+  lines.forEach((l, i) => drawLine(l, 0, tops[i], "cloud"));
+  if (brushOn && crash) {                              // torn red band behind the last line
+    ctx.save();
+    ctx.translate(-last.width / 2 - last.size * .4, lastTop + last.h * .6);
+    brush(last.width + last.size * .8, last.h * .78, 11, false);
+    ctx.restore();
+  }
+  lines.forEach((l, i) => drawLine(l, 0, tops[i], "ink"));
+  if (brushOn && !crash) {                             // underline swoosh, undoing the lean of the text
+    ctx.save();
+    ctx.transform(1, 0, .13, 1, 0, 0);
+    ctx.translate(-last.width / 2 + last.width * .11, lastTop + last.h * 1.36);
+    brush(last.width * .93, last.size * .26, 23, true);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ---------- render ----------
+function render() {
+  $("trotv").textContent = $("trot").value + "°";
+  const b = portraitBox();
+  const personCx = b ? b.x + b.w / 2 : W * .25;
+  ctx.clearRect(0, 0, W, H);
+  drawBackground(personCx);
+  drawPortrait(b);
+  const left = state.side === "left";
+  const area = left ? { x: W * .425, w: W * .565 } : { x: W * .01, w: W * .565 };
+  drawText(area);
+  drawOverlay();
+}
+
+// ---------- click, drag and resize on the picture ----------
+const ov = $("ov"), octx = ov.getContext("2d");
+const sel = { what: null, mode: null };                // what: "text" | "portrait" | "bg"
+
+function corners(what) {
+  if (what === "text") return state.textQuad;
+  const b = what === "bg" ? bgBox() : portraitBox();
+  return b && [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
+}
+// handles are pulled inside the picture so a corner that hangs off the edge can still be grabbed
+const handle = ([x, y]) => [Math.min(W - 12, Math.max(12, x)), Math.min(H - 12, Math.max(12, y))];
+function centre(what) {
+  const q = corners(what);
+  return [(q[0][0] + q[2][0]) / 2, (q[0][1] + q[2][1]) / 2];
+}
+function inPoly([px, py], q) {
+  let inside = false;
+  for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
+    const [xi, yi] = q[i], [xj, yj] = q[j];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// the round knob above the text block that turns it
+function rotKnob() {
+  const q = state.textQuad;
+  if (!q) return null;
+  const mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
+  const ex = q[1][0] - q[0][0], ey = q[1][1] - q[0][1], L = Math.hypot(ex, ey) || 1;
+  return { base: [mx, my], p: handle([mx + ey / L * 55, my - ex / L * 55]) };
+}
+function drawOverlay() {
+  octx.clearRect(0, 0, W, H);
+  const q = sel.what && corners(sel.what);
+  if (!q) return;
+  if (sel.what === "text") {
+    const k = rotKnob();
+    octx.lineWidth = 3; octx.strokeStyle = "#35c2ff";
+    octx.beginPath(); octx.moveTo(...k.base); octx.lineTo(...k.p); octx.stroke();
+    octx.beginPath(); octx.arc(k.p[0], k.p[1], 14, 0, Math.PI * 2);
+    octx.fillStyle = "#35c2ff"; octx.fill();
+    octx.fillStyle = "#fff"; octx.font = "bold 22px sans-serif"; octx.textAlign = "center"; octx.textBaseline = "middle";
+    octx.fillText("↻", k.p[0], k.p[1] + 1);
+  }
+  octx.lineWidth = 3; octx.strokeStyle = "#35c2ff";
+  octx.setLineDash([10, 7]);
+  octx.beginPath(); q.forEach(([x, y], i) => i ? octx.lineTo(x, y) : octx.moveTo(x, y)); octx.closePath(); octx.stroke();
+  octx.setLineDash([]);
+  for (const c of q) {
+    const [x, y] = handle(c);
+    octx.beginPath(); octx.arc(x, y, 10, 0, Math.PI * 2);
+    octx.fillStyle = "#fff"; octx.fill(); octx.stroke();
+  }
+}
+
+function pointerPos(e) {
+  const r = cv.getBoundingClientRect();
+  return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height];
+}
+function onKnob(p) {
+  if (sel.what !== "text") return false;
+  const k = rotKnob();
+  return k && Math.hypot(k.p[0] - p[0], k.p[1] - p[1]) < 20 * W / cv.getBoundingClientRect().width;
+}
+function onHandle(p) {
+  const q = sel.what && corners(sel.what);
+  if (!q) return false;
+  const tol = 18 * W / cv.getBoundingClientRect().width;
+  return q.some(c => { const [x, y] = handle(c); return Math.hypot(x - p[0], y - p[1]) < tol; });
+}
+function hit(p) {
+  if (state.textQuad && inPoly(p, state.textQuad)) return "text";
+  const q = corners("portrait");
+  if (q && inPoly(p, q)) return "portrait";
+  return inPoly(p, corners("bg")) ? "bg" : null;
+}
+const sizeInput = what => $({ text: "tsize", portrait: "psize", bg: "bsize" }[what]);
+function setSize(what, v) {
+  const el = sizeInput(what);
+  if (what === "portrait" && portraitBox()) {          // grow from the middle, not from the corner
+    const c = centre("portrait");
+    el.value = v;
+    const b = portraitBox();
+    state.pdx += c[0] - (b.x + b.w / 2); state.pdy += c[1] - (b.y + b.h / 2);
+  } else el.value = v;
+}
+function moveBy(what, dx, dy) {
+  if (what === "text") { state.tx += dx; state.ty += dy; }
+  else if (what === "bg") { state.bgx += dx; state.bgy += dy; }
+  else { state.pdx += dx; state.pdy += dy; }
+}
+let queued = false;
+function redrawSoon() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; render(); });
+}
+
+function initDirect() {
+  let drag = null;
+  cv.addEventListener("pointerdown", e => {
+    const p = pointerPos(e);
+    if (onKnob(p)) {
+      const c = state.textPivot;
+      drag = { mode: "rot", c, a0: Math.atan2(p[1] - c[1], p[0] - c[0]), r0: +$("trot").value };
+    } else if (onHandle(p)) {
+      const c = centre(sel.what);
+      drag = { mode: "size", c, d0: Math.max(20, Math.hypot(p[0] - c[0], p[1] - c[1])), s0: +sizeInput(sel.what).value };
+    } else {
+      sel.what = hit(p);
+      drag = sel.what ? { mode: "move", last: p } : null;
+    }
+    if (drag) cv.setPointerCapture(e.pointerId);
+    drawOverlay();
+  });
+  cv.addEventListener("pointermove", e => {
+    const p = pointerPos(e);
+    if (!drag) {
+      cv.style.cursor = onKnob(p) ? "grab" : onHandle(p) ? "nwse-resize" : hit(p) ? "move" : "default";
+      return;
+    }
+    if (drag.mode === "move") {
+      moveBy(sel.what, p[0] - drag.last[0], p[1] - drag.last[1]);
+      drag.last = p;
+    } else if (drag.mode === "rot") {
+      let r = drag.r0 + (Math.atan2(p[1] - drag.c[1], p[0] - drag.c[0]) - drag.a0) * 180 / Math.PI;
+      r = ((r % 360) + 540) % 360 - 180;
+      if (Math.abs(r) < 3) r = 0;                     // snaps back to level
+      $("trot").value = Math.round(r);
+    } else {
+      setSize(sel.what, drag.s0 * Math.hypot(p[0] - drag.c[0], p[1] - drag.c[1]) / drag.d0);
+    }
+    redrawSoon();
+  });
+  const stop = () => { drag = null; };
+  cv.addEventListener("pointerup", stop);
+  cv.addEventListener("pointercancel", stop);
+  cv.addEventListener("wheel", e => {
+    // the background only zooms once it is selected, so the page still scrolls
+    let what = sel.what || hit(pointerPos(e));
+    if (what === "bg" && sel.what !== "bg") what = null;
+    if (!what) return;
+    e.preventDefault();
+    sel.what = what;
+    setSize(what, +sizeInput(what).value * (e.deltaY < 0 ? 1.05 : 1 / 1.05));
+    redrawSoon();
+  }, { passive: false });
+  cv.addEventListener("dblclick", e => { if (hit(pointerPos(e)) === "text") { $("ed").focus(); $("ed").select(); } });
+  document.addEventListener("keydown", e => {
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (e.key === "Escape") { sel.what = null; drawOverlay(); return; }
+    if (!step || !sel.what || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    e.preventDefault();
+    const k = e.shiftKey ? 10 : 2;
+    moveBy(sel.what, step[0] * k, step[1] * k);
+    redrawSoon();
+  });
+  $("resetPos").addEventListener("click", () => {
+    state.tx = state.ty = state.pdx = state.pdy = state.bgx = state.bgy = 0;
+    $("tsize").value = 100; $("psize").value = 100; $("bsize").value = 100; $("trot").value = 0;
+    render();
+  });
+}
+
+// ---------- UI ----------
+function seg(id, key) {
+  const box = $(id);
+  const sync = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === state[key]));
+  box.addEventListener("click", e => {
+    const v = e.target.dataset && e.target.dataset.v;
+    if (!v) return;
+    state[key] = v;
+    if (key === "tpl") applyTemplateDefaults();
+    sync(); render();
+  });
+  sync();
+  return sync;
+}
+
+// sample headline per template: lines and the colour of each line
+const PRESET = {
+  teach: [["輪到你", "white"], ["教育我了？", "yellow"]],
+  crash: [["AI教育", "white"], ["翻車了？", "yellow"]],
+};
+function presetText(tpl) { return PRESET[tpl].map(l => l[0]).join("\n"); }
+function setText(text, cols) {
+  state.text = text; state.cols = cols;
+  $("ed").value = text;
+  paintEditor();
+}
+function usePreset(tpl) {
+  const cols = [];
+  PRESET[tpl].forEach(([t, c], i) => { for (let j = 0; j < t.length + (i < PRESET[tpl].length - 1 ? 1 : 0); j++) cols.push(c); });
+  setText(presetText(tpl), cols);
+}
+function applyTemplateDefaults() {
+  // only swap the sample text if the user hasn't typed their own
+  if (Object.keys(PRESET).some(k => presetText(k) === state.text)) usePreset(state.tpl);
+}
+
+// ---------- headline box ----------
+// The textarea does the editing; the mirror behind it shows the same text in colour.
+function paintEditor() {
+  const m = $("edMirror"), t = state.text;
+  m.textContent = "";
+  for (let i = 0; i < t.length;) {
+    let j = i;
+    while (j < t.length && state.cols[j] === state.cols[i]) j++;
+    const sp = document.createElement("span");
+    sp.className = "k-" + (state.cols[i] || "white");
+    sp.textContent = t.slice(i, j);
+    m.append(sp);
+    i = j;
+  }
+  m.append("​");                                   // keeps a trailing empty line its height
+  const ed = $("ed");
+  ed.style.height = "auto"; ed.style.height = ed.scrollHeight + 2 + "px";
+}
+function initEditor() {
+  const ed = $("ed");
+  ed.addEventListener("input", () => {
+    // work out what was typed or deleted; new characters take the colour of
+    // the character before them (or after them at the start of a line)
+    const o = state.text, n = ed.value;
+    let a = 0;
+    while (a < o.length && a < n.length && o[a] === n[a]) a++;
+    let z = 0;
+    while (z < o.length - a && z < n.length - a && o[o.length - 1 - z] === n[n.length - 1 - z]) z++;
+    const near = a > 0 && o[a - 1] !== "\n" ? state.cols[a - 1] : (state.cols[a] || state.cols[a - 1] || "white");
+    state.cols = state.cols.slice(0, a).concat(Array(n.length - a - z).fill(near), state.cols.slice(o.length - z));
+    state.text = n;
+    paintEditor(); render();
+  });
+  document.querySelectorAll(".colors button").forEach(b => {
+    b.addEventListener("mousedown", e => e.preventDefault());   // keep the selection in the text box
+    b.addEventListener("click", () => {
+      let a = ed.selectionStart, z = ed.selectionEnd;
+      if (a === z) {                                    // nothing selected: colour the caret's line
+        const t = state.text;
+        a = t.lastIndexOf("\n", a - 1) + 1;
+        z = t.indexOf("\n", z); if (z < 0) z = t.length;
+      }
+      for (let i = a; i < z; i++) state.cols[i] = b.dataset.c;
+      paintEditor(); render();
+    });
+  });
+}
+
+function selectPortrait(i) {
+  state.portrait = i; state.custom = null;
+  state.side = PORTRAITS[i].side;
+  $("flip").checked = false;
+  state.pdx = state.pdy = 0; $("psize").value = 100;
+  syncThumbs(); syncSide(); render();
+}
+function syncThumbs() {
+  document.querySelectorAll("#thumbs button").forEach((b, i) => b.classList.toggle("on", !state.custom && i === state.portrait));
+}
+
+function loadFile(file, cb) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => { const im = new Image(); im.onload = () => cb(im); im.src = fr.result; };
+  fr.readAsDataURL(file);
+}
+
+function say(t) { $("msg").textContent = t; clearTimeout(say.t); say.t = setTimeout(() => $("msg").textContent = "", 2500); }
+
+let syncSide;
+function init() {
+  initEditor();
+  usePreset("teach");
+  ["brush", "tsize", "trot", "flip", "psize", "bsize"].forEach(id => $(id).addEventListener("input", render));
+  initDirect();
+  seg("tpl", "tpl");
+  syncSide = seg("side", "side");
+
+  PORTRAITS.forEach((p, i) => {
+    const im = new Image(); im.src = p.src; im.onload = render;
+    state.imgs[i] = im;
+    const b = document.createElement("button");
+    b.title = p.label;
+    const t = new Image(); t.src = p.src; t.alt = p.label; b.append(t);
+    b.addEventListener("click", () => selectPortrait(i));
+    $("thumbs").append(b);
+  });
+  syncThumbs();
+
+  $("rand").addEventListener("click", () => {
+    let i; do { i = Math.floor(Math.random() * PORTRAITS.length); } while (i === state.portrait && !state.custom);
+    selectPortrait(i);
+  });
+  $("upBtn").addEventListener("click", () => $("up").click());
+  $("up").addEventListener("change", e => loadFile(e.target.files[0], im => { state.custom = im; syncThumbs(); render(); }));
+  $("bgBtn").addEventListener("click", () => $("bg").click());
+  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; render(); }));
+  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; render(); });
+
+  $("dl").addEventListener("click", () => cv.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const name = state.text.replace(/\s+/g, "") || "meme";
+    a.download = name.replace(/[\\/:*?"<>|]/g, "") + ".png";
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, "image/png"));
+  $("copy").addEventListener("click", () => cv.toBlob(async blob => {
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); say("已複製"); }
+    catch (e) { say("這個瀏覽器不能直接複製，請用下載"); }
+  }, "image/png"));
+
+  render();
+  // redraw once the heavy font is actually ready
+  if (document.fonts && document.fonts.load) document.fonts.load(`900 100px ${FONT}`, "輪到你").then(render);
+}
+init();
+</script>
+</body>
+</html>
