@@ -12,6 +12,13 @@
   body { margin: 0; background: #141416; color: #eee; font: 15px/1.5 "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
   main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; max-width: 1500px; margin: 0 auto; }
   @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  /* phone: the preview goes first and stays pinned at the top while the controls scroll under it */
+  @media (max-width: 700px) {
+    main { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+    main > section:last-child { display: contents; }
+    main .stage { order: -1; position: sticky; top: 0; z-index: 10; background: #141416; padding: 8px 0; margin: -8px 0 0; }
+    main > section:last-child > :not(.stage) { order: 1; }
+  }
   h1 { font-size: 20px; margin: 0 0 12px; }
   fieldset { border: 1px solid #333; border-radius: 8px; margin: 0 0 12px; padding: 10px 12px 12px; }
   legend { padding: 0 6px; color: #ffd400; font-weight: 700; }
