@@ -198,7 +198,8 @@
         <button id="bgFill">填滿畫面</button>
         <button id="bgFit">完整顯示</button>
       </div>
-      <small>點文字和人像以外的地方就能選背景，拖曳移動、拉角落縮放。直的圖預設完整顯示，兩側用模糊的同一張圖補。</small>
+      <label class="check"><input type="checkbox" id="bgBlurFill" checked> 背景沒蓋滿時，空白處用同色系模糊填滿</label>
+      <small>點文字和人像以外的地方就能選背景，拖曳移動、拉角落縮放。直的圖預設完整顯示。</small>
     </fieldset>
   </section>
 </main>
@@ -282,12 +283,14 @@ function drawBackdrop(personCx) {                     // drawn in a W x H space
 function drawBackground(personCx) {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);  // shows wherever the background was moved away
   const b = bgBox();
+  // where the background doesn't reach the frame edge, a blurred, darkened copy
+  // of it fills in (same colours), unless that option is off and it stays black
+  if ($("bgBlurFill").checked && (b.x > 0.5 || b.y > 0.5 || b.x + b.w < W - 0.5 || b.y + b.h < H - 0.5)) {
+    if (state.bg) coverImage(state.bg, 28);
+    else { ctx.save(); ctx.filter = "blur(28px)"; drawBackdrop(personCx); ctx.restore(); }
+    ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, W, H);
+  }
   if (state.bg) {
-    // where the image doesn't reach the frame edge, a blurred, darkened copy fills in
-    if (b.x > 0 || b.y > 0 || b.x + b.w < W || b.y + b.h < H) {
-      coverImage(state.bg, 28);
-      ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, W, H);
-    }
     ctx.save();
     if (state.tpl === "crash") ctx.filter = "blur(5px)";
     ctx.drawImage(state.bg, b.x, b.y, b.w, b.h);
@@ -980,6 +983,7 @@ function init() {
   $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; setBgFit(false); });
   $("bgFill").addEventListener("click", () => setBgFit(false));
   $("bgFit").addEventListener("click", () => setBgFit(true));
+  $("bgBlurFill").addEventListener("change", render);
 
   $("dl").addEventListener("click", () => cv.toBlob(blob => {
     const a = document.createElement("a");
