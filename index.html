@@ -431,31 +431,41 @@ function brush(len, thick, seed, taper) {
   scratch.width = cw; scratch.height = ch;
   const g = scratch.getContext("2d");
   const img = g.createImageData(cw, ch), px = img.data;
-  const half0 = thick / 2, rise = thick * 1.05, oy = taper ? ch - padY - half0 : ch / 2;
+  const half0 = thick / 2, rise = thick * 1.45, oy = taper ? ch - padY - half0 : ch / 2;
 
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
     const u = x - padX, t = u / len;
     if (t < -.08 || t > 1.08) continue;
     const tc = clamp01(t);
     let mid, half;
+    const dy0 = y - oy;
     if (taper) {
       mid = -rise * (1 - Math.pow(1 - tc, 2.1));       // rises fast, then levels off
-      half = half0 * Math.min(1, Math.pow(tc / .09, .55)) * Math.pow(1 - tc, .85) * 1.3;
-      if (half > half0) half = half0;
-      if (t > .9) half = Math.max(half, 1.3);           // a few hairs run past the tip
+      // fullest a short way in, then a long thinning tail; the underside
+      // gives out sooner than the top, as on the originals
+      const headIn = Math.min(1, Math.pow(tc / .06, .6));
+      half = half0 * headIn * Math.pow(1 - tc, dy0 - mid > 0 ? 1.25 : .65);
+      if (t > .8 && dy0 - mid <= 0) half = Math.max(half, 1.2);   // a few hairs run past the tip
     } else { mid = 0; half = half0; }
-    const dy = (y - oy) - mid, ady = Math.abs(dy);
+    const dy = dy0 - mid, ady = Math.abs(dy);
     // slightly wobbly rim
     const rim = half * (1 + .07 * (vnoise(u * .05, dy > 0 ? 3.5 : 9.5, seed) - .5) * 2)
               + (vnoise(u * .35, dy > 0 ? 1.5 : 6.5, seed + 1) - .5) * 1.6;
     let a = clamp01(rim - ady + .5);
     if (a > 0) {
       const e = ady / Math.max(half, .01);              // 0 centre .. 1 rim
-      const streak = .62 * vnoise(u / 75, dy / 2.1, seed + 2) + .38 * vnoise(u / 24, dy / 1.05 + 40, seed + 3);
+      // taper: the bristle lines are very long, so the stroke splits into
+      // parallel strands instead of breaking up into dashes
+      const streak = taper
+        ? .72 * vnoise(u / (len * .42), dy / 1.6, seed + 2) + .28 * vnoise(u / (len * .11), dy / 1.05 + 40, seed + 3)
+        : .62 * vnoise(u / 75, dy / 2.1, seed + 2) + .38 * vnoise(u / 24, dy / 1.05 + 40, seed + 3);
       let dry;
       if (taper) {
-        dry = -.3 + 1.1 * Math.pow(tc, 2.6) + .85 * sstep(.62, 1, e) * (.2 + tc)
-            + (t < .07 ? (1 - t / .07) * .8 : 0) + (t > 1 ? (t - 1) * 9 : 0);
+        dry = -.42 + .9 * Math.pow(tc, 1.8) + .55 * sstep(.6, 1, e) * (.2 + tc)
+            + (t < .05 ? (1 - t / .05) * .8 : 0) + (t > 1 ? (t - 1) * 9 : 0);
+        // one clean split: a second, lower strand peels away from the body
+        const gy = half0 * .3, gw = 2.6 * sstep(.1, .34, tc);
+        if (dy > 0) a *= 1 - clamp01(gw - Math.abs(dy - gy) + .5) * sstep(.1, .16, tc);
       } else {
         const ends = Math.max(sstep(.16, -.06, t), sstep(.82, 1.06, t));
         dry = -.3 + 1.25 * ends + .6 * sstep(.72, 1, e) + .12 * sstep(.3, .7, vnoise(u / 140, dy / 9, seed + 4));
@@ -465,13 +475,13 @@ function brush(len, thick, seed, taper) {
     // stray bristle lines that travel alongside the body
     let extra = 0;
     if (taper) {
-      if (t > .33 && t < 1.04) {                        // hairline riding above the body
-        const off = -(half + 2.6 + 2.5 * tc);
-        extra = clamp01(1.5 - Math.abs(dy - off)) * sstep(.3, .4, vnoise(u / 55, 3.3, seed + 5));
+      if (t > .3 && t < 1.04) {                         // long hairline riding above the body
+        const off = -(half0 * Math.pow(1 - tc, .65) + 2.4 + 2 * tc);
+        extra = clamp01(1.3 - Math.abs(dy - off)) * sstep(.34, .42, vnoise(u / (len * .2), 3.3, seed + 5));
       }
-      if (t > .2 && t < .64) {                          // broken flecks under the belly
-        const off = half + 2.8;
-        extra = Math.max(extra, clamp01(1.25 - Math.abs(dy - off)) * sstep(.52, .6, vnoise(u / 22, 9.1, seed + 6)));
+      if (t > .16 && t < .78) {                         // and one trailing under the belly
+        const off = half0 * Math.pow(1 - tc, 1.25) + 3 + 3 * tc;
+        extra = Math.max(extra, clamp01(1.2 - Math.abs(dy - off)) * sstep(.4, .48, vnoise(u / (len * .16), 9.1, seed + 6)));
       }
     } else if (ady > half) {
       const row = Math.floor((ady - half) / 3.2), inRow = ((ady - half) % 3.2);
@@ -506,6 +516,10 @@ function fillFor(color, top, size) {
   return g;
 }
 
+// Text is placed by its alphabetic baseline, BASE em below the top of the line.
+// (Browsers disagree on where textBaseline "top" sits for this font: Safari
+// drew the letters lower than Chrome, down onto the red underline.)
+const BASE = .88;
 const TALL = 1.14;   // glyphs are stretched vertically, like the condensed look of the originals
 
 // Dry-brush scratches for the "crash" lettering: thin diagonal streaks where
@@ -544,7 +558,8 @@ function drawLine(line, cx, top, pass) {
   ctx.save();
   ctx.translate(cx, top); ctx.scale(1, TALL);
   ctx.font = `900 ${size}px ${FONT}`;
-  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.translate(0, size * BASE);
   ctx.lineJoin = "round"; ctx.miterLimit = 2;
   const bold = size * .012;                            // extra weight added around the glyphs
   const crashTpl = state.tpl === "crash";
@@ -569,7 +584,7 @@ function drawLine(line, cx, top, pass) {
     for (let i = sh; i >= 0; i -= 1.5) ctx.strokeText(text, -i * .35, i / TALL);
     // each colour run is drawn from its own spot along the line
     const left = -line.width / 2;
-    const runs = line.runs.map(r => ({ ...r, x: left + ctx.measureText(text.slice(0, r.start)).width, fill: fillFor(r.color, 0, size) }));
+    const runs = line.runs.map(r => ({ ...r, x: left + ctx.measureText(text.slice(0, r.start)).width, fill: fillFor(r.color, -size * BASE, size) }));
     ctx.textAlign = "left";
     for (const r of runs) if (r.color === "red") {      // red text gets a white rim
       ctx.strokeStyle = "#fff"; ctx.lineWidth = bold + sw * .5;
@@ -584,7 +599,7 @@ function drawLine(line, cx, top, pass) {
       lctx.globalCompositeOperation = "source-over";
       lctx.clearRect(0, 0, W, H);
       lctx.setTransform(ctx.getTransform());
-      lctx.font = ctx.font; lctx.textAlign = "left"; lctx.textBaseline = "top"; lctx.lineJoin = "round";
+      lctx.font = ctx.font; lctx.textAlign = "left"; lctx.textBaseline = "alphabetic"; lctx.lineJoin = "round";
       lctx.lineWidth = bold;
       for (const r of runs) {
         lctx.fillStyle = lctx.strokeStyle = r.fill;
@@ -715,8 +730,8 @@ function drawText(area) {
   if (brushOn && !crash) {                             // underline swoosh, undoing the lean of the text
     ctx.save();
     ctx.transform(1, 0, .13, 1, 0, 0);
-    ctx.translate(-last.width / 2 + last.width * .11, lastTop + last.h * 1.36);
-    brush(last.width * .93, last.size * .26, 23, true);
+    ctx.translate(-last.width / 2 + last.width * .13, lastTop + last.h * 1.33);
+    brush(last.width * .86, last.size * .23, 23, true);
     ctx.restore();
   }
   ctx.restore();
