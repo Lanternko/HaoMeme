@@ -607,7 +607,17 @@ function drawLine(line, cx, top, pass) {
 }
 
 // full-width ？！ are a whole character wide; the originals use the narrow ones
-function halfPunct(t) { return t.replace(/？/g, "?").replace(/！/g, "!"); }
+// Glow Sans TC v0.93 has no glyph for these common characters, only for their
+// variant code points, so 教 etc. fell back to another (thin) font. Swap in the
+// variant while the title font is loaded; every one is a single BMP character,
+// so per-character colours still line up.
+const GLOW_VARIANTS = { 告: "吿", 值: "値", 真: "眞", 教: "敎", 清: "淸", 填: "塡", 慎: "愼", 鎮: "鎭", 顛: "顚", 巔: "巓" };
+const GLOW_RE = new RegExp(`[${Object.keys(GLOW_VARIANTS).join("")}]`, "g");
+function glowVariants(t) {
+  const ok = document.fonts && document.fonts.check('900 100px "Hao Title"', "敎");
+  return ok ? t.replace(GLOW_RE, c => GLOW_VARIANTS[c]) : t;
+}
+function halfPunct(t) { return glowVariants(t.replace(/？/g, "?").replace(/！/g, "!")); }
 
 // split the headline into lines, each cut into runs of one colour
 function textLines() {
