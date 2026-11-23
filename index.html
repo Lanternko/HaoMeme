@@ -193,8 +193,12 @@
         <button id="bgClear">用預設</button>
         <input type="file" id="bg" accept="image/*" hidden>
       </div>
-      <label>大小 <input type="range" id="bsize" min="30" max="300" value="100"></label>
-      <small>點文字和人像以外的地方就能選背景。</small>
+      <label>大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
+      <div class="row">
+        <button id="bgFill">填滿畫面</button>
+        <button id="bgFit">完整顯示</button>
+      </div>
+      <small>點文字和人像以外的地方就能選背景，拖曳移動、拉角落縮放。直的圖預設完整顯示，兩側用模糊的同一張圖補。</small>
     </fieldset>
   </section>
 </main>
@@ -232,10 +236,23 @@ function coverImage(img, blur) {
   ctx.restore();
 }
 
-// the background as a box that can be moved and scaled like the other pieces
+// an uploaded background at size 100 fills the frame (cover)
+const bgCover = img => Math.max(W / img.width, H / img.height) * 1.06;
+// size value at which the whole uploaded image fits inside the frame
+const bgFitSize = img => Math.min(W / img.width, H / img.height) / bgCover(img) * 100;
+
+// the background as a box that can be moved and scaled like the other pieces;
+// an uploaded image keeps its own shape, so it can be shrunk to show all of it
 function bgBox() {
-  const k = $("bsize").value / 100, w = W * k, h = H * k;
+  const k = $("bsize").value / 100;
+  const [bw, bh] = state.bg ? [state.bg.width * bgCover(state.bg), state.bg.height * bgCover(state.bg)] : [W, H];
+  const w = bw * k, h = bh * k;
   return { x: W / 2 + state.bgx - w / 2, y: H / 2 + state.bgy - h / 2, w, h, k };
+}
+function setBgFit(fit) {
+  state.bgx = state.bgy = 0;
+  $("bsize").value = fit && state.bg ? bgFitSize(state.bg) : 100;
+  render();
 }
 
 function drawBackdrop(personCx) {                     // drawn in a W x H space
@@ -265,11 +282,23 @@ function drawBackdrop(personCx) {                     // drawn in a W x H space
 function drawBackground(personCx) {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);  // shows wherever the background was moved away
   const b = bgBox();
+  if (state.bg) {
+    // where the image doesn't reach the frame edge, a blurred, darkened copy fills in
+    if (b.x > 0 || b.y > 0 || b.x + b.w < W || b.y + b.h < H) {
+      coverImage(state.bg, 28);
+      ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, W, H);
+    }
+    ctx.save();
+    if (state.tpl === "crash") ctx.filter = "blur(5px)";
+    ctx.drawImage(state.bg, b.x, b.y, b.w, b.h);
+    ctx.restore();
+  } else {
   ctx.save();
   ctx.translate(b.x, b.y); ctx.scale(b.k, b.k);
   ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
   drawBackdrop(personCx);
   ctx.restore();
+  }
   // shading that belongs to the frame, not to the background, so it stays put
   if (state.bg) {
     const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -946,8 +975,11 @@ function init() {
   $("upBtn").addEventListener("click", () => $("up").click());
   $("up").addEventListener("change", e => loadFile(e.target.files[0], im => { state.custom = im; syncThumbs(); render(); }));
   $("bgBtn").addEventListener("click", () => $("bg").click());
-  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; render(); }));
-  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; render(); });
+  // a tall or square picture starts fully visible; a wide one fills the frame
+  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; setBgFit(im.width / im.height < 1.2); }));
+  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; setBgFit(false); });
+  $("bgFill").addEventListener("click", () => setBgFit(false));
+  $("bgFit").addEventListener("click", () => setBgFit(true));
 
   $("dl").addEventListener("click", () => cv.toBlob(blob => {
     const a = document.createElement("a");
