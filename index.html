@@ -129,8 +129,8 @@
   footer p { margin: 0; padding: 20px 0 40px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
   /* GitHub link: a squarish beige button with blue text */
   footer a { display: inline-block; margin: 0 4px; padding: 5px 12px; border-radius: 5px; background: #ece3cf; color: #1d5bb8;
-             font-weight: 700; text-decoration: none; transition: background 120ms var(--ease); }
-  footer a:hover { background: #f6efe0; }
+             font-weight: 700; text-decoration: none; transition: background 120ms var(--ease), color 120ms var(--ease); }
+  footer a:hover, footer a:focus-visible { background: #1d5bb8; color: #ece3cf; }
 
   @media (max-width: 980px) { main { grid-template-columns: 1fr; } .preview { position: static; } }
   /* phone: the preview stays pinned at the top while the controls scroll under it */
