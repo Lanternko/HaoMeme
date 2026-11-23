@@ -198,7 +198,7 @@
         <button id="bgFill">填滿畫面</button>
         <button id="bgFit">完整顯示</button>
       </div>
-      <label class="check"><input type="checkbox" id="bgBlurFill" checked> 背景沒蓋滿時，空白處用同色系模糊填滿</label>
+      <label class="check"><input type="checkbox" id="bgBlurFill" checked> 背景沒蓋滿時，從圖片邊緣往外延伸補滿</label>
       <small>點文字和人像以外的地方就能選背景，拖曳移動、拉角落縮放。直的圖預設完整顯示。</small>
     </fieldset>
   </section>
@@ -284,22 +284,49 @@ function drawBackground(personCx) {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);  // shows wherever the background was moved away
   const b = bgBox();
   drawBgBox(b, personCx);
-  // where the background doesn't reach the frame edge, the part that is showing
-  // right now is blown up, blurred and darkened to fill the rest (same colours);
+  // where the background doesn't reach the frame edge, the picture is carried on
+  // past its own edges: the part that is showing is flipped over each edge like
+  // a reflection (so colours meet exactly at the seam, and nothing is repeated
+  // as a second, enlarged copy);
   // with that option off the gaps stay black
   const vx0 = Math.max(0, b.x), vy0 = Math.max(0, b.y);
   const vw = Math.min(W, b.x + b.w) - vx0, vh = Math.min(H, b.y + b.h) - vy0;
   const gaps = b.x > 0.5 || b.y > 0.5 || b.x + b.w < W - 0.5 || b.y + b.h < H - 0.5;
   if ($("bgBlurFill").checked && gaps && vw > 4 && vh > 4) {
-    const buf = drawBackground.buf || (drawBackground.buf = Object.assign(document.createElement("canvas"), { width: W, height: H }));
-    const bctx = buf.getContext("2d");
+    const M = 80;                                    // spare rim so the blur has something to read at the frame edge
+    const mk = (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h });
+    const buf = drawBackground.buf || (drawBackground.buf = mk(W, H));
+    const ext = drawBackground.ext || (drawBackground.ext = mk(W + 2 * M, H + 2 * M));
+    const bctx = buf.getContext("2d"), ectx = ext.getContext("2d");
     bctx.clearRect(0, 0, W, H); bctx.drawImage(cv, 0, 0);
-    const r = Math.max(W / vw, H / vh) * 1.15, dw = vw * r, dh = vh * r;
-    ctx.save();
-    ctx.filter = "blur(28px)";
-    ctx.drawImage(buf, vx0, vy0, vw, vh, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    ctx.restore();
-    ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, W, H);
+    // a very thin sliver would need thousands of reflections: widen it first
+    const tw = Math.max(vw, 64), th = Math.max(vh, 64);
+    ectx.setTransform(1, 0, 0, 1, 0, 0);
+    ectx.clearRect(0, 0, ext.width, ext.height);
+    const i0 = Math.floor((-M - vx0) / tw), i1 = Math.floor((W + M - vx0) / tw);
+    const j0 = Math.floor((-M - vy0) / th), j1 = Math.floor((H + M - vy0) / th);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const fx = i & 1, fy = j & 1;                  // every other copy is flipped
+      ectx.setTransform(fx ? -1 : 1, 0, 0, fy ? -1 : 1,
+                        M + vx0 + (i + fx) * tw, M + vy0 + (j + fy) * th);
+      ectx.drawImage(buf, vx0, vy0, vw, vh, 0, 0, tw + .5, th + .5);
+    }
+    // right at the picture's edge the reflection is left sharp, so there is no
+    // visible seam; it gets blurrier and a bit darker the farther out it goes
+    const fog = drawBackground.fog || (drawBackground.fog = mk(W, H));
+    const fctx = fog.getContext("2d");
+    fctx.globalCompositeOperation = "source-over";
+    fctx.clearRect(0, 0, W, H);
+    fctx.filter = "blur(22px)";
+    fctx.drawImage(ext, -M, -M);
+    fctx.filter = "none";
+    fctx.fillStyle = "rgba(0,0,0,.18)"; fctx.fillRect(0, 0, W, H);
+    fctx.globalCompositeOperation = "destination-out";   // feathered hole over the picture
+    fctx.filter = "blur(16px)";
+    fctx.fillStyle = "#000"; fctx.fillRect(vx0 - 24, vy0 - 24, vw + 48, vh + 48);
+    fctx.filter = "none";
+    ctx.drawImage(ext, -M, -M);
+    ctx.drawImage(fog, 0, 0);
     ctx.drawImage(buf, vx0, vy0, vw, vh, vx0, vy0, vw, vh);     // the sharp background back on top
   }
   drawFrameShade();
