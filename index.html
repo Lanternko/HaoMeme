@@ -530,7 +530,7 @@ function streakPattern() {
     const streak = .55 * vnoise(x / 20, y / 1.4, 81) + .3 * vnoise(x / 8, y / 1.0 + 30, 82)
                  + .15 * vnoise(x / 3, y / 1.2 + 70, 83) + (hash2(x, y, 84) - .5) * .1;
     const patch = vnoise(x / 60, y / 22, 85);
-    d[(y * c.width + x) * 4 + 3] = 255 * sstep(.755, .77, streak) * sstep(.6, .72, patch);
+    d[(y * c.width + x) * 4 + 3] = 255 * sstep(.775, .79, streak) * sstep(.68, .78, patch);
   }
   g.putImageData(img, 0, 0);
   return streakPat = lctx.createPattern(c, "repeat");
@@ -590,13 +590,15 @@ function drawLine(line, cx, top, pass) {
         lctx.fillStyle = lctx.strokeStyle = r.fill;
         lctx.strokeText(r.text, r.x, 0); lctx.fillText(r.text, r.x, 0);
       }
-      // Bristle marks: short streaks that run along and across the strokes
-      // (not all one way), kept only in a thin band at the edge of the letters.
+      // Bristle marks: a few short streaks, all running roughly along the line
+      // of text, kept only in a thin band at the edge of the letters. Kept
+      // sparse on purpose: the originals are bright and nearly clean, with
+      // just small nicks at the edges.
       l2.setTransform(1, 0, 0, 1, 0, 0);
       l2.globalCompositeOperation = "source-over";
       l2.clearRect(0, 0, W, H);
       l2.setTransform(ctx.getTransform());
-      for (const [ang, ox, oy] of [[.04, 0, 0], [1.54, 170, 60], [-.07, 330, 240], [1.62, 90, 410]]) {
+      for (const [ang, ox, oy] of [[.04, 0, 0], [-.07, 330, 240]]) {
         l2.save();
         l2.rotate(ang); l2.translate(ox, oy);
         l2.fillStyle = streakPattern();
@@ -608,7 +610,7 @@ function drawLine(line, cx, top, pass) {
       // so its outlines also run through the middle of the letters.
       // Core = the letter shape shrunk by `edge` pixels (the overlap of
       // copies shifted in every direction). Marks inside the core are dropped.
-      const edge = size * .03;
+      const edge = size * .024;
       l3.setTransform(1, 0, 0, 1, 0, 0);
       l3.globalCompositeOperation = "source-over";
       l3.clearRect(0, 0, W, H);
