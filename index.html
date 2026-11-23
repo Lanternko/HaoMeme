@@ -18,7 +18,7 @@
 @font-face { font-family: "Outfit"; src: url("fonts/outfit-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "Outfit"; src: url("fonts/outfit-700.ttf") format("truetype"); font-weight: 700; font-display: swap; }
   /* Page look follows the arammeta design system: dark charcoal canvas, flat
-     surfaces split by hairlines, one orchid accent, 8/12px corners. */
+     surfaces split by hairlines, one soft blue accent, 8/12px corners. */
   :root {
     color-scheme: dark;
     --bg: #0a0b0d;
@@ -29,10 +29,10 @@
     --text-dim: #6b7280;
     --border: rgba(255, 255, 255, .09);
     --border-strong: rgba(255, 255, 255, .15);
-    --accent: #c084fc;
+    --accent: #6aa8f7;
     --offwhite: #e6e6e3;
-    --accent-soft: #e2c2ff;
-    --accent-on: #1a0b26;
+    --accent-soft: #9cc6fb;
+    --accent-on: #0b1a2e;
     --header-h: 56px;
     --r-sm: 8px;
     --r-md: 12px;
@@ -68,7 +68,7 @@
      which controls belong to which part of the picture */
   fieldset { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); margin: 0; padding: 16px; min-width: 0; overflow: hidden; }
   legend { float: left; display: flex; align-items: center; gap: 8px; width: calc(100% + 32px); margin: -16px -16px 16px; padding: 11px 16px;
-           background: var(--accent); color: var(--accent-on); font-size: 15px; font-weight: 700; line-height: 1.25; }
+           background: var(--offwhite); color: #111; font-size: 15px; font-weight: 700; line-height: 1.25; }
   legend + * { clear: both; }
   label { display: block; margin-top: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
   label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 400; font-size: 14px; }
@@ -94,6 +94,13 @@
   .seg button.on, .seg button.on:hover { background: var(--offwhite); color: #111; }
   .seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
   .seg button.on:last-child { clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); }
+  /* the template switch stands on its own above the cards, bigger */
+  .tpl-seg { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); }
+  .tpl-seg button { padding: 18px 16px; font-size: 18px; letter-spacing: .02em; }
+  .tpl-seg button:first-child { margin-right: -12px; }
+  .tpl-seg button:last-child { margin-left: -12px; }
+  .tpl-seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
+  .tpl-seg button.on:last-child { clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%); }
   button svg { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   input[type=range] { display: block; width: 100%; margin: 8px 0 0; accent-color: var(--accent); }
@@ -106,7 +113,7 @@
   #ed { position: relative; z-index: 1; display: block; width: 100%; min-height: 84px; resize: none; overflow: hidden;
         background: transparent; color: transparent; caret-color: #fff; transition: border-color 120ms var(--ease); }
   #ed:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent); }
-  #ed::selection { background: rgba(192, 132, 252, .4); color: transparent; }
+  #ed::selection { background: rgba(106, 168, 247, .4); color: transparent; }
   #edMirror { position: absolute; inset: 0; overflow: hidden; background: var(--bg); pointer-events: none; }
   .k-white { color: #fff; } .k-yellow { color: #ffe600; } .k-red { color: #ff4048; }
   .colors > span { flex: 1; }
@@ -161,13 +168,10 @@
   </div>
 
   <section class="panel">
-    <fieldset>
-      <legend>版型</legend>
-      <div class="seg" id="tpl">
-        <button data-v="teach">教育我了？</button>
-        <button data-v="crash">翻車了？</button>
-      </div>
-    </fieldset>
+    <div class="seg tpl-seg" id="tpl" role="group" aria-label="版型">
+      <button data-v="teach">教育我了？</button>
+      <button data-v="crash">翻車了？</button>
+    </div>
 
     <fieldset>
       <legend>大字</legend>
