@@ -30,6 +30,7 @@
     --border: rgba(255, 255, 255, .09);
     --border-strong: rgba(255, 255, 255, .15);
     --accent: #c084fc;
+    --offwhite: #e6e6e3;
     --accent-soft: #e2c2ff;
     --accent-on: #1a0b26;
     --header-h: 56px;
@@ -52,7 +53,7 @@
   .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   #msg { color: var(--text-muted); font-size: 12px; }
 
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; padding-top: 24px; padding-bottom: 64px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; padding-top: 24px; padding-bottom: 32px; }
   .preview { position: sticky; top: calc(var(--header-h) + 24px); }
   .stage { position: relative; border-radius: var(--r-md); overflow: hidden; box-shadow: 0 0 0 1px var(--border); background: #000; }
   canvas { width: 100%; height: auto; display: block; }
@@ -62,10 +63,12 @@
   .note + .note { margin-top: 4px; color: var(--text-dim); }
 
   /* one flat panel; its groups are split by hairlines, not boxed again */
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
-  fieldset { border: 0; border-top: 1px solid var(--border); margin: 0; padding: 16px; min-width: 0; }
-  fieldset:first-child { border-top: 0; }
-  legend { float: left; width: 100%; padding: 0; margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 600; line-height: 1.25; }
+  .panel { display: flex; flex-direction: column; gap: 16px; }
+  /* each group is its own card with a titled header strip, so it is plain
+     which controls belong to which part of the picture */
+  fieldset { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); margin: 0; padding: 16px; min-width: 0; overflow: hidden; }
+  legend { float: left; display: flex; align-items: center; gap: 8px; width: calc(100% + 32px); margin: -16px -16px 16px; padding: 11px 16px;
+           background: var(--accent); color: var(--accent-on); font-size: 15px; font-weight: 700; line-height: 1.25; }
   legend + * { clear: both; }
   label { display: block; margin-top: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
   label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 400; font-size: 14px; }
@@ -81,10 +84,17 @@
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* segmented control: one pill, the chosen part filled with the accent */
-  .seg { display: flex; padding: 3px; gap: 2px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; }
-  .seg button { flex: 1; border: 0; background: none; border-radius: 999px; color: var(--text-muted); padding: 7px 10px; }
+  .seg { display: flex; background: var(--surface-raised); border-radius: 4px; overflow: hidden; }
+  .seg button { flex: 1; border: 0; background: none; border-radius: 0; color: var(--text-muted); padding: 10px 12px; font-size: 13px; font-weight: 700; }
   .seg button:hover { background: none; color: var(--text); }
-  .seg button.on { background: var(--accent); color: var(--accent-on); }
+  /* the chosen half is off-white and ends in a slanted cut; the halves
+     overlap by the width of the cut so it sits on the middle line */
+  .seg button:first-child { margin-right: -8px; }
+  .seg button:last-child { margin-left: -8px; }
+  .seg button.on, .seg button.on:hover { background: var(--offwhite); color: #111; }
+  .seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
+  .seg button.on:last-child { clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); }
+  button svg { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   input[type=range] { display: block; width: 100%; margin: 8px 0 0; accent-color: var(--accent); }
   input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
@@ -108,6 +118,10 @@
   .thumbs button.on { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
   #side { flex: 1; }
+
+  footer p { margin: 0; padding: 20px 0 40px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
+  footer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  footer a:hover { color: var(--accent-soft); text-decoration: underline; }
 
   @media (max-width: 980px) { main { grid-template-columns: 1fr; } .preview { position: static; } }
   /* phone: the preview stays pinned at the top while the controls scroll under it */
@@ -169,16 +183,16 @@
       </div>
       <small>Enter 換行，每行自動放大到排得下。沒選字就改游標那一行。</small>
       <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
-      <label>字體大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
-      <label>旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
+      <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
+      <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
     </fieldset>
 
     <fieldset>
       <legend>人像</legend>
       <div class="thumbs" id="thumbs"></div>
       <div class="row">
-        <button id="rand">隨機換一張</button>
-        <button id="upBtn">上傳自己的</button>
+        <button id="rand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>隨機換一張</button>
+        <button id="upBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳自己的</button>
         <input type="file" id="up" accept="image/*" hidden>
       </div>
       <div class="row">
@@ -189,18 +203,18 @@
         </div>
         <label class="check" style="margin:0"><input type="checkbox" id="flip"> 翻轉</label>
       </div>
-      <label>大小 <input type="range" id="psize" min="30" max="260" value="100"></label>
+      <label>人像大小 <input type="range" id="psize" min="30" max="260" value="100"></label>
       <div class="row"><button id="resetPos">重設位置大小</button></div>
     </fieldset>
 
     <fieldset>
       <legend>背景</legend>
       <div class="row" style="margin-top:0">
-        <button id="bgBtn">上傳背景圖</button>
+        <button id="bgBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳背景圖</button>
         <button id="bgClear">用預設</button>
         <input type="file" id="bg" accept="image/*" hidden>
       </div>
-      <label>大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
+      <label>背景大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
       <div class="row">
         <button id="bgFill">填滿畫面</button>
         <button id="bgFit">完整顯示</button>
@@ -210,6 +224,10 @@
     </fieldset>
   </section>
 </main>
+
+<footer class="rail">
+  <p>覺得好玩的話，到 <a href="https://github.com/Lanternko/HaoMeme" target="_blank" rel="noopener">GitHub</a> 幫我按顆星星 ★</p>
+</footer>
 
 <script src="portraits.js"></script>
 <script>
