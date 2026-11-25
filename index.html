@@ -87,6 +87,8 @@
   label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 400; font-size: 14px; }
   .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
   .row > button { flex: 1; }
+  .row.checks { gap: 24px; }
+  .row.checks label.check { margin: 0; }
   small { display: block; margin-top: 8px; color: var(--text-dim); font-size: 12px; line-height: 1.6; }
 
   button { background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 12px;
@@ -134,6 +136,12 @@
   .k-white { color: #fff; } .k-yellow { color: #ffe600; } .k-red { color: #ff4048; }
   .colors > span { flex: 1; }
   .colors button { flex: none; min-width: 44px; font-size: 14px; font-weight: 700; padding: 6px 10px; }
+  /* phones: while typing, the colours ride just above the keyboard, clear of the
+     system's 剪下 / 拷貝 / 貼上 menu that pops up next to the selection */
+  #kbColors { position: fixed; left: 0; right: 0; top: 0; z-index: 60; margin: 0; gap: 8px;
+    padding: 8px 16px; background: var(--surface-raised); border-top: 1px solid var(--border-strong); }
+  #kbColors[hidden] { display: none; }
+  #kbColors button { min-width: 64px; min-height: 40px; font-size: 17px; }
 
   .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .thumbs button { padding: 0; height: 72px; overflow: hidden; background: var(--surface-raised); border-color: var(--border); }
@@ -226,12 +234,20 @@
         <button data-c="yellow" class="k-yellow">黃</button>
         <button data-c="red" class="k-red">紅</button>
       </div>
-      <small>Enter 換行，每行自動放大到排得下。沒選字就改游標那一行。</small>
-      <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
+      <small>換行會自動排版，選取文字可以換色</small>
+      <div id="kbColors" class="row colors" hidden>
+        <span>選字上色</span>
+        <button data-c="white" class="k-white">白</button>
+        <button data-c="yellow" class="k-yellow">黃</button>
+        <button data-c="red" class="k-red">紅</button>
+      </div>
+      <div class="row checks">
+        <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
+        <label class="check"><input type="checkbox" id="italic"> 斜體</label>
+      </div>
       <label>筆刷大小 <input type="range" id="brsize" min="30" max="250" value="100"></label>
       <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
       <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
-      <label class="check"><input type="checkbox" id="italic"> 斜體</label>
     </fieldset>
 
     <fieldset>
@@ -1435,19 +1451,45 @@ function initEditor() {
     state.text = n;
     paintEditor(); render();
   });
+  // the last selection made in the box: a phone may drop it once the box loses focus
+  let sel = [0, 0];
+  const keepSel = () => { if (document.activeElement === ed) sel = [ed.selectionStart, ed.selectionEnd]; };
+  document.addEventListener("selectionchange", keepSel);
+  ed.addEventListener("keyup", keepSel); ed.addEventListener("pointerup", keepSel);
+
+  // phones: a colour bar sits right above the on-screen keyboard while the box is in use
+  const bar = $("kbColors"), vv = window.visualViewport;
+  const phone = matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0;
+  const placeBar = () => {
+    if (bar.hidden) return;
+    const bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+    bar.style.top = bottom - bar.offsetHeight + "px";
+  };
+  if (phone) {
+    ed.addEventListener("focus", () => { bar.hidden = false; placeBar(); });
+    ed.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== ed) bar.hidden = true; }, 0));
+    if (vv) { vv.addEventListener("resize", placeBar); vv.addEventListener("scroll", placeBar); }
+  }
+
   document.querySelectorAll(".colors button").forEach(b => {
     b.addEventListener("mousedown", e => e.preventDefault());   // keep the selection in the text box
-    b.addEventListener("click", () => {
-      let a = ed.selectionStart, z = ed.selectionEnd;
+    // on a touch screen the tap would take focus from the box (closing the keyboard
+    // and the bar), so the colour is put on as the finger lands instead
+    b.addEventListener("touchstart", e => { e.preventDefault(); paint(b.dataset.c); }, { passive: false });
+    b.addEventListener("click", () => paint(b.dataset.c));
+  });
+  function paint(c) {
+    {                                                   // colour the selection
+      let [a, z] = document.activeElement === ed ? [ed.selectionStart, ed.selectionEnd] : sel;
       if (a === z) {                                    // nothing selected: colour the caret's line
         const t = state.text;
         a = t.lastIndexOf("\n", a - 1) + 1;
         z = t.indexOf("\n", z); if (z < 0) z = t.length;
       }
-      for (let i = a; i < z; i++) state.cols[i] = b.dataset.c;
+      for (let i = a; i < z; i++) state.cols[i] = c;
       paintEditor(); render();
-    });
-  });
+    }
+  }
 }
 
 function selectPortrait(i) {
