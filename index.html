@@ -145,9 +145,12 @@
 
   .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .thumbs button { padding: 0; height: 72px; overflow: hidden; background: var(--surface-raised); border-color: var(--border); }
-  .thumbs button:hover { filter: brightness(1.15); }
-  /* a ring drawn as a shadow, not an outline: iPhone Safari left the outline off */
-  .thumbs button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  @media (hover: hover) { .thumbs button:hover { filter: brightness(1.15); } }
+  /* The ring is drawn inside the tile, over the picture. Drawn outside (outline or
+     shadow), iPhone Safari cut it off once a tapped tile was brightened. */
+  .thumbs button { position: relative; }
+  .thumbs button.on::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--accent);
+    border-radius: inherit; pointer-events: none; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
   .bgs { grid-template-columns: repeat(5, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
