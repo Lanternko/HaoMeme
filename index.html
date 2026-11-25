@@ -215,7 +215,7 @@
       <canvas id="cv" width="1280" height="720"></canvas>
       <canvas id="ov" width="1280" height="720"></canvas>
     </div>
-    <p class="note">點選文字、人像或背景，拖曳移動；拉角落圓點或滾輪縮放，拉文字上方圓點旋轉；方向鍵微調，Esc 取消，雙擊文字改字。</p>
+    <p class="note">點選文字、人像或背景，拖曳移動；拉角落圓點、滾輪或兩指縮放，拉文字上方圓點旋轉；方向鍵微調，Esc 取消，雙擊文字改字。</p>
     <p class="note">輸出 1280×720。人像來自「拆書人」頻道原始封面，只能私下玩梗，不要拿去冒充本人發文。</p>
   </div>
 
@@ -1321,8 +1321,20 @@ function redrawSoon() {
 
 function initDirect() {
   let drag = null;
+  const fingers = new Map();                          // pointerId -> position, for two-finger zoom
+  const spread = () => { const [a, b] = [...fingers.values()]; return Math.max(10, Math.hypot(a[0] - b[0], a[1] - b[1])); };
   cv.addEventListener("pointerdown", e => {
     const p = pointerPos(e);
+    if (e.pointerType === "touch") fingers.set(e.pointerId, p);
+    if (fingers.size === 2) {                          // second finger: pinch whatever the first one picked
+      const [a, b] = [...fingers.values()];
+      sel.what = sel.what || hit([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+      drag = sel.what ? { mode: "pinch", d0: spread(), s0: +sizeInput(sel.what).value } : null;
+      cv.setPointerCapture(e.pointerId);
+      drawOverlay();
+      return;
+    }
+    if (fingers.size > 2) return;
     if (onKnob(p)) {
       const c = state.textPivot;
       drag = { mode: "rot", c, a0: Math.atan2(p[1] - c[1], p[0] - c[0]), r0: +$("trot").value };
@@ -1338,11 +1350,14 @@ function initDirect() {
   });
   cv.addEventListener("pointermove", e => {
     const p = pointerPos(e);
+    if (fingers.has(e.pointerId)) fingers.set(e.pointerId, p);
     if (!drag) {
       cv.style.cursor = onKnob(p) ? "grab" : onHandle(p) ? "nwse-resize" : hit(p) ? "move" : "default";
       return;
     }
-    if (drag.mode === "move") {
+    if (drag.mode === "pinch") {
+      if (fingers.size === 2) setSize(sel.what, drag.s0 * spread() / drag.d0);
+    } else if (drag.mode === "move") {
       moveBy(sel.what, p[0] - drag.last[0], p[1] - drag.last[1]);
       drag.last = p;
     } else if (drag.mode === "rot") {
@@ -1359,7 +1374,8 @@ function initDirect() {
   document.addEventListener("pointerdown", e => {
     if (sel.what && e.target !== cv) { sel.what = null; drawOverlay(); }
   });
-  const stop = () => { drag = null; };
+  // lifting a finger ends the gesture; the finger left on the glass does nothing until it lifts too
+  const stop = e => { fingers.delete(e.pointerId); drag = null; };
   cv.addEventListener("pointerup", stop);
   cv.addEventListener("pointercancel", stop);
   cv.addEventListener("wheel", e => {
