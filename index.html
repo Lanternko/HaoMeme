@@ -580,7 +580,10 @@ function vnoise(x, y, seed) {                          // smooth value noise, 0.
 const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 const sstep = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
 
-const scratch = document.createElement("canvas");
+// The stroke is computed pixel by pixel (slow, ~20 ms), so each finished one is
+// kept and reused while its size stays the same: dragging a slider for the
+// person or the background must not recompute it every frame.
+const brushCache = new Map();
 // taper=true: underline swoosh, blunt forked head at (0,0), sweeping up and
 // thinning to hairs at (len, -rise). taper=false: a flat band with torn ends.
 // ink: [r, g, b] of the paint. The flat band also gets dark bristle lines
@@ -588,10 +591,16 @@ const scratch = document.createElement("canvas");
 function brush(len, thick, seed, taper, ink = [243, 13, 20], dark = 0) {
   const padX = Math.ceil(len * .1) + 6, padY = Math.ceil(thick * (taper ? 2.2 : 1)) + 8;
   const cw = Math.ceil(len + padX * 2), ch = Math.ceil(thick + padY * 2);
+  const half0 = thick / 2, rise = thick * 1.45, oy = taper ? ch - padY - half0 : ch / 2;
+  const key = [len, thick, seed, taper, ink, dark].join();
+  const hit = brushCache.get(key);
+  if (hit) { ctx.drawImage(hit, -padX, -oy); return; }
+  if (brushCache.size > 6) brushCache.delete(brushCache.keys().next().value);
+  const scratch = document.createElement("canvas");
   scratch.width = cw; scratch.height = ch;
+  brushCache.set(key, scratch);
   const g = scratch.getContext("2d");
   const img = g.createImageData(cw, ch), px = img.data;
-  const half0 = thick / 2, rise = thick * 1.45, oy = taper ? ch - padY - half0 : ch / 2;
 
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
     const u = x - padX, t = u / len;
@@ -976,6 +985,39 @@ function speedLines(w, top, h, size, seed) {
 // "text" then draws the lettering on top of everything, plus the glow again
 // where it lies over the person (so the letters still stand out there).
 // Both passes lay the lines out the same way.
+// The black glow is the slowest thing on the page: each line is stroked 18 times
+// with a blur, and a new letter size means drawing all of it again. So each
+// line's glow is drawn once at a fixed letter size and kept; changing the size
+// or the turn only scales and turns that copy, which is quick.
+const CLOUD_SIZE = 256;
+const cloudCache = new Map();
+function cloudLine(l) {
+  const key = [l.text, l.tall, state.tpl, $("italic").checked,
+    document.fonts ? document.fonts.check(`900 100px ${FONT}`, "教") : 1].join("|");
+  let hit = cloudCache.get(key);
+  if (!hit) {
+    if (cloudCache.size > 12) cloudCache.delete(cloudCache.keys().next().value);
+    const S = CLOUD_SIZE, w = l.width * S / l.size;
+    const pad = S * (.55 + CRASH_SLANT * l.tall / 2);
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(w + pad * 2); c.height = Math.ceil(S * l.tall + pad * 2);
+    const g = c.getContext("2d");
+    drawLine({ ...l, size: S, width: w }, c.width / 2, pad, "cloud", g);
+    hit = { c, ox: c.width / 2, oy: pad };
+    cloudCache.set(key, hit);
+  }
+  return hit;
+}
+function drawCloud(c, lines, xs, tops) {               // c already holds the text's turn and lean
+  lines.forEach((l, i) => {
+    const { c: img, ox, oy } = cloudLine(l), k = l.size / CLOUD_SIZE;
+    c.save();
+    c.translate(xs[i], tops[i]); c.scale(k, k);
+    c.drawImage(img, -ox, -oy);
+    c.restore();
+  });
+}
+
 function drawText(area, pass, person) {
   const lines = textLines();
   if (pass === "brush") state.brushQuad = null;
@@ -1042,7 +1084,7 @@ function drawText(area, pass, person) {
       gctx.setTransform(1, 0, 0, 1, 0, 0);
       gctx.clearRect(0, 0, W, H);
       gctx.setTransform(ctx.getTransform());
-      lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "cloud", gctx));
+      drawCloud(gctx, lines, xs, tops);
       gctx.setTransform(1, 0, 0, 1, 0, 0);
       gctx.globalCompositeOperation = "destination-in";
       drawPortrait(person, gctx, true);
@@ -1053,7 +1095,7 @@ function drawText(area, pass, person) {
     ctx.restore();
     return;
   }
-  lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "cloud"));
+  drawCloud(ctx, lines, xs, tops);
   const paint = brushImgs.crash;
   if (brushOn && crash && paint?.complete && paint.naturalWidth) {   // red paint stroke behind the last line
     ctx.save();
@@ -1475,7 +1517,7 @@ let syncSide;
 function init() {
   initEditor();
   usePreset("teach");
-  ["brush", "brsize", "tsize", "trot", "italic", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", render));
+  ["brush", "brsize", "tsize", "trot", "italic", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", redrawSoon));
   initDirect();
   initBackdrops();
   seg("tpl", "tpl");
