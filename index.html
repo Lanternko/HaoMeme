@@ -172,6 +172,16 @@
     .tpl-seg button { padding: 14px 8px; font-size: 15px; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  /* phones: the finished picture, to long-press and save or copy */
+  #sheet { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+           padding: 16px; background: rgba(0,0,0,.94); }
+  #sheet[hidden] { display: none; }
+  .sheet-box { width: min(720px, 100%); display: flex; flex-direction: column; gap: 12px; }
+  #sheetTip { margin: 0; color: var(--text); font-size: 15px; line-height: 1.6; }
+  #sheetImg { width: 100%; border-radius: var(--r-sm); -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto; }
+  .sheet-box .row { display: flex; gap: 8px; }
+  .sheet-box .row button { flex: 1; padding: 12px; font-size: 15px; }
+  .sheet-box [hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -221,6 +231,7 @@
       <label>筆刷大小 <input type="range" id="brsize" min="30" max="250" value="100"></label>
       <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
       <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
+      <label class="check"><input type="checkbox" id="italic"> 斜體</label>
     </fieldset>
 
     <fieldset>
@@ -261,6 +272,17 @@
     </fieldset>
   </section>
 </main>
+
+<div id="sheet" hidden role="dialog" aria-modal="true" aria-label="儲存圖片">
+  <div class="sheet-box">
+    <p id="sheetTip"></p>
+    <img id="sheetImg" alt="做好的梗圖">
+    <div class="row">
+      <button class="primary" id="sheetShare">分享或儲存</button>
+      <button id="sheetClose">關閉</button>
+    </div>
+  </div>
+</div>
 
 <footer class="rail">
   <p>覺得好玩的話，到 <a href="https://github.com/Lanternko/HaoMeme" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a> 幫我按顆星星 ★</p>
@@ -750,7 +772,7 @@ function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
   const { text, size } = line;
   ctx.save();
   ctx.translate(cx, top);
-  if (state.tpl === "crash") {                          // italic: each line leans about its own middle
+  if ($("italic").checked) {                           // italic: each line leans about its own middle
     const mid = size * line.tall / 2;
     ctx.translate(0, mid); ctx.transform(1, 0, -CRASH_SLANT, 1, 0, 0); ctx.translate(0, -mid);
   }
@@ -1006,7 +1028,7 @@ function drawText(area, pass, person) {
   const tops = lines.map(l => { const t = y; y += l.h * (1 + gap); return t; });
   const last = lines[lines.length - 1], lastTop = tops[tops.length - 1];
   {                                                    // remember the block's outline for clicking and dragging
-    const lean = crash ? CRASH_SLANT * Math.max(...lines.map(l => l.h)) / 2 : 0;
+    const lean = $("italic").checked ? CRASH_SLANT * Math.max(...lines.map(l => l.h)) / 2 : 0;
     const m = ctx.getTransform(), hw = Math.max(...lines.map(l => l.width)) / 2 + 14 + lean;
     const t = -total / 2 - 8, b = total / 2 + 8;
     state.textQuad = [[-hw, t], [hw, t], [hw, b], [-hw, b]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
@@ -1335,6 +1357,7 @@ function applyTemplateDefaults(prev) {
   // and the background only if it is still the old template's own
   if (Object.keys(PRESET).some(k => presetText(k) === state.text)) usePreset(state.tpl);
   if (state.backdrop === TPL_BG[prev]) { state.backdrop = TPL_BG[state.tpl]; syncBgs(); }
+  $("italic").checked = state.tpl === "crash";        // the crash covers lean; the others stand up
 }
 
 // ---------- headline box ----------
@@ -1452,7 +1475,7 @@ let syncSide;
 function init() {
   initEditor();
   usePreset("teach");
-  ["brush", "brsize", "tsize", "trot", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", render));
+  ["brush", "brsize", "tsize", "trot", "italic", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", render));
   initDirect();
   initBackdrops();
   seg("tpl", "tpl");
@@ -1517,19 +1540,48 @@ function init() {
   // Android already drops downloads into the gallery, and desktop keeps the plain download.
   const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const TO_PHOTOS = IOS && !!navigator.canShare && navigator.canShare({ files: [new File([""], "x.png", { type: "image/png" })] });
-  if (TO_PHOTOS) $("dl").textContent = "存到照片";
+  // Phones are where saving breaks: browsers inside LINE / Discord / Instagram ignore
+  // downloads, and Android often "copies" a picture that other apps then can't paste.
+  // So on a phone the picture is also shown full size: long-pressing a real image
+  // always offers the phone's own 儲存 / 複製, and the share sheet sends it straight to an app.
+  const MOBILE = matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0;
+  const INAPP = /Line\/|FBAN|FBAV|FB_IAB|Instagram|Barcelona|Discord|MicroMessenger|KAKAOTALK|; wv\)/i.test(navigator.userAgent);
+  const CAN_SHARE = !!navigator.canShare && navigator.canShare({ files: [new File([""], "x.png", { type: "image/png" })] });
+  function openSheet(tip) {
+    $("sheetImg").src = cv.toDataURL("image/png");
+    $("sheetTip").textContent = tip + (INAPP ? "（在 LINE、Discord 這類 App 裡開的網頁常常存不了，也可以從右上角選「用瀏覽器開啟」。）" : "");
+    $("sheetShare").hidden = !CAN_SHARE;
+    $("sheet").hidden = false;
+  }
+  const closeSheet = () => { $("sheet").hidden = true; $("sheetImg").removeAttribute("src"); };
+  $("sheetClose").addEventListener("click", closeSheet);
+  $("sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
+  $("sheetShare").addEventListener("click", async () => {
+    try { await navigator.share({ files: [pngFile()] }); } catch (e) {}
+  });
+
+  const SHARE_FIRST = TO_PHOTOS && !INAPP;
+  if (SHARE_FIRST) $("dl").textContent = "存到照片";
   $("dl").addEventListener("click", async () => {
-    if (!TO_PHOTOS) { cv.toBlob(download, "image/png"); return; }
-    const file = pngFile();
-    say("選「儲存影像」就會存進照片");
-    try { await navigator.share({ files: [file] }); }
-    catch (e) { if (e.name !== "AbortError") download(file); }
+    if (SHARE_FIRST) {
+      const file = pngFile();
+      say("選「儲存影像」就會存進照片");
+      try { await navigator.share({ files: [file] }); }
+      catch (e) { if (e.name !== "AbortError") openSheet("長按圖片，選「加入照片」或「儲存影像」。"); }
+      return;
+    }
+    if (!MOBILE) { cv.toBlob(download, "image/png"); return; }
+    if (!INAPP) cv.toBlob(download, "image/png");
+    openSheet(INAPP ? "長按圖片，選「儲存圖片」或「下載圖片」。" : "沒有開始下載的話，長按圖片，選「下載圖片」。");
   });
   // hand the clipboard a promise inside the tap itself: Safari refuses a write that starts after an await
   $("copy").addEventListener("click", async () => {
     const blob = new Promise(res => cv.toBlob(res, "image/png"));
-    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); say("已複製"); }
-    catch (e) { say(`這個瀏覽器不能直接複製，請按${$("dl").textContent}`); }
+    let ok = false;
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); ok = true; say("已複製"); }
+    catch (e) { if (!MOBILE) say(`這個瀏覽器不能直接複製，請按${$("dl").textContent}`); }
+    if (MOBILE && !(ok && IOS)) openSheet(ok ? "已複製。貼不上的話，長按圖片，選「複製圖片」。" : "長按圖片，選「複製圖片」。");
   });
 
   render();
