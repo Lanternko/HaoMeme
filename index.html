@@ -146,7 +146,8 @@
   .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .thumbs button { padding: 0; height: 72px; overflow: hidden; background: var(--surface-raised); border-color: var(--border); }
   .thumbs button:hover { filter: brightness(1.15); }
-  .thumbs button.on { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  /* a ring drawn as a shadow, not an outline: iPhone Safari left the outline off */
+  .thumbs button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
   .bgs { grid-template-columns: repeat(5, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
