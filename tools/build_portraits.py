@@ -24,6 +24,10 @@ META = {
     "G": ("托腮斜眼", "left"),
     "H": ("握拳", "left"),
     "I": ("雙手抱胸", "right"),
+    "J": ("連帽口罩", "right"),
+    "K": ("閉眼大叫", "left"),
+    "L": ("傻眼", "left"),
+    "M": ("攤手解釋", "right"),
 }
 
 # where the original cutout sits inside each widened portrait (tools/find_anchors.py)

@@ -101,6 +101,9 @@
   .tpl-seg button:last-child { margin-left: -12px; }
   .tpl-seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
   .tpl-seg button.on:last-child { clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%); }
+  /* a middle one overlaps both neighbours and is slanted on both sides */
+  .tpl-seg button:not(:first-child):not(:last-child) { margin: 0 -12px; }
+  .tpl-seg button.on:not(:first-child):not(:last-child) { clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
   button svg { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   input[type=range] { display: block; width: 100%; margin: 8px 0 0; accent-color: var(--accent); }
@@ -124,6 +127,9 @@
   .thumbs button:hover { filter: brightness(1.15); }
   .thumbs button.on { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .bgs { grid-template-columns: repeat(5, 1fr); }
+  .bgs button { height: auto; aspect-ratio: 16 / 9; }
+  .bgs canvas { height: 100%; }
   #side { flex: 1; }
 
   footer p { margin: 0; padding: 20px 0 40px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
@@ -142,6 +148,7 @@
     main { gap: 12px; padding-top: 0; }
     .preview { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 8px 0; }
     .preview .note { display: none; }
+    .tpl-seg button { padding: 14px 8px; font-size: 15px; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -173,6 +180,7 @@
     <div class="seg tpl-seg" id="tpl" role="group" aria-label="版型">
       <button data-v="teach">教育我了？</button>
       <button data-v="crash">翻車了？</button>
+      <button data-v="nope">免談</button>
     </div>
 
     <fieldset>
@@ -189,6 +197,7 @@
       </div>
       <small>Enter 換行，每行自動放大到排得下。沒選字就改游標那一行。</small>
       <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
+      <label>筆刷大小 <input type="range" id="brsize" min="30" max="250" value="100"></label>
       <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
       <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
     </fieldset>
@@ -215,7 +224,8 @@
 
     <fieldset>
       <legend>背景</legend>
-      <div class="row" style="margin-top:0">
+      <div class="thumbs bgs" id="bgs"></div>
+      <div class="row">
         <button id="bgBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳背景圖</button>
         <button id="bgClear">用預設</button>
         <input type="file" id="bg" accept="image/*" hidden>
@@ -236,6 +246,7 @@
 </footer>
 
 <script src="portraits.js"></script>
+<script src="backgrounds.js"></script>
 <script>
 "use strict";
 const W = 1280, H = 720;
@@ -248,8 +259,8 @@ const FONT = '"Hao Title", "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", 
 // background were dragged from their default spots; textQuad is where the text
 // block landed on screen and textPivot the point it rotates around.
 // text is the headline (lines split by \n); cols holds one colour per character.
-const state = { tpl: "teach", portrait: 0, side: "left", custom: null, bg: null, imgs: [],
-                tx: 0, ty: 0, pdx: 0, pdy: 0, bgx: 0, bgy: 0, textQuad: null, textPivot: null,
+const state = { tpl: "teach", backdrop: "red", portrait: 0, side: "left", custom: null, bg: null, imgs: [],
+                tx: 0, ty: 0, pdx: 0, pdy: 0, bgx: 0, bgy: 0, brx: 0, bry: 0, textQuad: null, textPivot: null, brushQuad: null,
                 text: "", cols: [] };
 
 // ---------- deterministic random (so the brush doesn't flicker on redraw) ----------
@@ -287,28 +298,65 @@ function setBgFit(fit) {
   render();
 }
 
-function drawBackdrop(personCx) {                     // drawn in a W x H space
-  if (state.bg) { coverImage(state.bg, state.tpl === "crash" ? 5 : 0); return; }
-  if (state.tpl === "teach") {
-    ctx.fillStyle = "#0b0b0c"; ctx.fillRect(0, 0, W, H);
-    const g = ctx.createRadialGradient(personCx, 250, 40, personCx, 300, 640);
-    g.addColorStop(0, "#ff1616"); g.addColorStop(.28, "#d40b10"); g.addColorStop(.55, "#6a0508");
-    g.addColorStop(.8, "#1c0a0b"); g.addColorStop(1, "#0b0b0c");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  } else {
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, "#5c6b78"); g.addColorStop(.5, "#27323d"); g.addColorStop(1, "#0d1218");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+// built-in backgrounds; each template starts on its own one
+const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"], ["white", "白牆"]];
+const TPL_BG = { teach: "red", crash: "grey", nope: "dark" };
+const bgPhotos = {};                                   // photo backgrounds from backgrounds.js, by key
+const brushImgs = {};                                  // painted strokes from backgrounds.js, by template
+
+// a soft round light, squashed to rx x ry (gradients only: Safari has no canvas blur)
+function glow(g, x, y, rx, ry, rgb, a) {
+  g.save();
+  g.translate(x, y); g.scale(1, ry / rx);
+  const b = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  b.addColorStop(0, `rgba(${rgb},${a})`); b.addColorStop(.5, `rgba(${rgb},${a * .45})`); b.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = b; g.fillRect(-rx, -rx, rx * 2, rx * 2);
+  g.restore();
+}
+
+function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
+  if (kind === "red") {
+    g.fillStyle = "#0b0b0c"; g.fillRect(0, 0, W, H);
+    const b = g.createRadialGradient(personCx, 250, 40, personCx, 300, 640);
+    b.addColorStop(0, "#ff1616"); b.addColorStop(.28, "#d40b10"); b.addColorStop(.55, "#6a0508");
+    b.addColorStop(.8, "#1c0a0b"); b.addColorStop(1, "#0b0b0c");
+    g.fillStyle = b; g.fillRect(0, 0, W, H);
+  } else if (kind === "grey") {
+    const b = g.createLinearGradient(0, 0, W, H);
+    b.addColorStop(0, "#5c6b78"); b.addColorStop(.5, "#27323d"); b.addColorStop(1, "#0d1218");
+    g.fillStyle = b; g.fillRect(0, 0, W, H);
     // soft light blobs, like an out-of-focus room
     const r = rng(7);
     for (let i = 0; i < 16; i++) {
       const x = r() * W, y = r() * H, rad = 60 + r() * 160;
-      const b = ctx.createRadialGradient(x, y, 0, x, y, rad);
-      b.addColorStop(0, `rgba(${150 + r() * 80},${180 + r() * 60},255,${.05 + r() * .09})`);
-      b.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = b; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      const c = g.createRadialGradient(x, y, 0, x, y, rad);
+      c.addColorStop(0, `rgba(${150 + r() * 80},${180 + r() * 60},255,${.05 + r() * .09})`);
+      c.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = c; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     }
+  } else if (kind === "dark") {
+    // a dim room far out of focus: window light top left, a bright doorway
+    // top right, and darkest in the middle where the headline goes
+    g.fillStyle = "#15120f"; g.fillRect(0, 0, W, H);
+    glow(g, 120, 90, 330, 230, "176,166,150", .5);
+    glow(g, 1130, 120, 170, 300, "214,208,196", .45);
+    glow(g, 1110, 640, 360, 170, "112,94,76", .45);
+    glow(g, 60, 620, 260, 200, "86,74,62", .5);
+    glow(g, 760, 360, 560, 330, "0,0,0", .85);
+  } else if (kind === "white") {
+    // a plain studio wall, a touch darker toward the corners
+    const b = g.createRadialGradient(W / 2, H * .42, 80, W / 2, H / 2, 820);
+    b.addColorStop(0, "#ffffff"); b.addColorStop(1, "#dcdcd8");
+    g.fillStyle = b; g.fillRect(0, 0, W, H);
+  } else {
+    const im = bgPhotos[kind];
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    if (im && im.naturalWidth) g.drawImage(im, 0, 0, W, H);
   }
+}
+function drawBackdrop(personCx) {
+  if (state.bg) { coverImage(state.bg, state.tpl === "crash" ? 5 : 0); return; }
+  paintBackdrop(ctx, state.backdrop, personCx);
 }
 
 function drawBackground(personCx) {
@@ -387,7 +435,7 @@ function drawFrameShade() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   } else {
     const v = ctx.createRadialGradient(W / 2, H / 2, 380, W / 2, H / 2, 800);
-    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, `rgba(0,0,0,${state.backdrop === "white" ? .12 : .55})`);
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
   }
 }
@@ -542,10 +590,11 @@ function fillFor(color, top, size) {
   if (color === "white") return "#fff";
   const g = ctx.createLinearGradient(0, top, 0, top + size);
   if (color === "yellow") {
-    if (state.tpl === "teach") {                        // near-flat lemon yellow
-      g.addColorStop(0, "#fff533"); g.addColorStop(1, "#ffe600");
-    } else {                                           // yellow melting into orange
-      g.addColorStop(0, "#fff36b"); g.addColorStop(.45, "#ffe600"); g.addColorStop(.8, "#ffc800"); g.addColorStop(1, "#ff9500");
+    // colours sampled from the original covers
+    if (state.tpl !== "crash") {                        // flat lemon yellow
+      g.addColorStop(0, "#fcef06"); g.addColorStop(1, "#fbec06");
+    } else {                                           // lemon on top, warming to orange-yellow at the foot
+      g.addColorStop(0, "#fcfb05"); g.addColorStop(.42, "#fcf805"); g.addColorStop(.75, "#fcd405"); g.addColorStop(1, "#f9b108");
     }
   } else {
     g.addColorStop(0, "#ff5a4a"); g.addColorStop(.5, "#f3101c"); g.addColorStop(1, "#b00008");
@@ -558,6 +607,9 @@ function fillFor(color, top, size) {
 // drew the letters lower than Chrome, down onto the red underline.)
 const BASE = .88;
 const TALL = 1.14;   // glyphs are stretched vertically, like the condensed look of the originals
+// "crash" lettering: upright strokes lean right by this much (≈ 0.19 on screen
+// once the -7° tilt of the lines is added, as measured on the original cover)
+const CRASH_SLANT = .32;
 
 // Dry-brush scratches for the "crash" lettering: thin diagonal streaks where
 // the paint is missing, so the black underneath shows through the colour.
@@ -567,6 +619,9 @@ const lctx = layer.getContext("2d");
 const layer2 = document.createElement("canvas");    // holds the scratch marks before they are cut out
 layer2.width = W; layer2.height = H;
 const l2 = layer2.getContext("2d");
+const hitLayer = document.createElement("canvas");  // where the letters are, for telling text from brush on a click
+hitLayer.width = W; hitLayer.height = H;
+const hctx = hitLayer.getContext("2d", { willReadFrequently: true });
 const layer3 = document.createElement("canvas");    // the letters shrunk inward: their "core"
 layer3.width = W; layer3.height = H;
 const l3 = layer3.getContext("2d");
@@ -630,20 +685,25 @@ function put(c, stroke, text, x, y) {                  // strokeText / fillText 
 function drawLine(line, cx, top, pass) {
   const { text, size } = line;
   ctx.save();
-  ctx.translate(cx, top); ctx.scale(1, TALL);
+  ctx.translate(cx, top);
+  if (state.tpl === "crash") {                          // italic: each line leans about its own middle
+    const mid = size * line.tall / 2;
+    ctx.translate(0, mid); ctx.transform(1, 0, -CRASH_SLANT, 1, 0, 0); ctx.translate(0, -mid);
+  }
+  ctx.scale(1, line.tall);
   ctx.font = `900 ${size}px ${FONT}`;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
   ctx.translate(0, size * BASE);
   ctx.lineJoin = "round"; ctx.miterLimit = 2;
   const bold = size * .012;                            // extra weight added around the glyphs
-  const crashTpl = state.tpl === "crash";
-  const sw = size * (crashTpl ? .115 : .075) + bold;   // outline width
-  const sh = Math.max(4, size * .05);                  // hard shadow drop
+  const crashTpl = state.tpl === "crash", nope = state.tpl === "nope";
+  const sw = size * (crashTpl ? .115 : nope ? .05 : .075) + bold;   // outline width
+  const sh = Math.max(4, size * (nope ? .03 : .05));   // hard shadow drop
   if (pass === "cloud") {
     // Same recipe as a layer-style "outer glow with spread": the outline is
     // redrawn many times, each a little wider and fainter, so the black is
     // solid at the letter and thins out to nothing at a fixed distance.
-    const reach = size * (crashTpl ? .13 : .3), steps = 18;
+    const reach = size * (crashTpl ? .13 : nope ? .16 : .3), steps = 18;
     ctx.strokeStyle = "#000";
     ctx.filter = `blur(${Math.max(1, size * .02)}px)`;
     for (let i = 0; i < steps; i++) {
@@ -653,9 +713,21 @@ function drawLine(line, cx, top, pass) {
       put(ctx, true, text, -sh * .3, sh * .9);
     }
   } else {
-    // hard shadow: the outline smeared downward and a touch to the left
+    // the letters and their outline, in plain black on the hit canvas: clicks there pick the text
+    hctx.setTransform(ctx.getTransform()); hctx.font = ctx.font;
+    hctx.textAlign = "center"; hctx.textBaseline = "alphabetic"; hctx.lineJoin = "round";
+    hctx.lineWidth = sw; hctx.fillStyle = hctx.strokeStyle = "#000";
+    put(hctx, true, text, 0, 0); put(hctx, false, text, 0, 0);
     ctx.strokeStyle = "#000"; ctx.lineWidth = sw;
-    for (let i = sh; i >= 0; i -= 1.5) put(ctx, true, text, -i * .35, i / TALL);
+    if (nope) {                                        // thin outline with a soft drop shadow
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = size * .07; ctx.shadowOffsetY = sh;
+      put(ctx, true, text, 0, 0);
+      ctx.restore();
+    } else {
+      // hard shadow: the outline smeared downward and a touch to the left
+      for (let i = sh; i >= 0; i -= 1.5) put(ctx, true, text, -i * .35, i / line.tall);
+    }
     // each colour run is drawn from its own spot along the line
     const left = -line.width / 2;
     const runs = line.runs.map(r => ({ ...r, x: left + textW(ctx, text.slice(0, r.start)), fill: fillFor(r.color, -size * BASE, size) }));
@@ -754,68 +826,177 @@ function textLines() {
   return out;
 }
 
+// "nope": a solid dark-red brush block behind the lower half of the last line,
+// with dry-brush ragged ends, plus a few thin red streaks flying out each side
+function speedLines(w, top, h, size, seed) {
+  const r = rng(seed);
+  // the block: one shape whose edges wander like a dry brush
+  const rows = 30, cols = 24, L = [], R = [], T = [], B = [];
+  let dl = 0, dr = 0;
+  for (let i = 0; i <= rows; i++) {
+    dl = dl * .6 + (r() - .5) * .05; dr = dr * .6 + (r() - .5) * .05;
+    const spike = () => (r() < .18 ? r() * .06 : 0);  // an occasional hair sticking out
+    L.push([-w * (.64 + dl + spike()), top + h * i / rows]);
+    R.push([w * (.63 + dr + spike()), top + h * i / rows]);
+  }
+  for (let i = 1; i < cols; i++) {                     // top and bottom edges: a little ragged too
+    const x = w * (.63 - 1.27 * i / cols);
+    T.push([x, top + h * (r() - .5) * .12]);
+    B.push([x, top + h * (1 + (r() - .5) * .14)]);
+  }
+  const shape = () => {
+    ctx.beginPath();
+    R.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    B.forEach(([x, y]) => ctx.lineTo(x, y));
+    for (let i = L.length - 1; i >= 0; i--) ctx.lineTo(L[i][0], L[i][1]);
+    for (let i = T.length - 1; i >= 0; i--) ctx.lineTo(T[i][0], T[i][1]);
+    ctx.closePath();
+  };
+  // a black smudge under the block, as on the cover
+  ctx.save();
+  ctx.filter = `blur(${Math.max(2, h * .12)}px)`;
+  ctx.translate(0, h * .28); shape(); ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fill();
+  ctx.restore();
+  const g = ctx.createLinearGradient(0, top, 0, top + h);
+  g.addColorStop(0, "#c7291d"); g.addColorStop(1, "#a71c15");
+  shape(); ctx.fillStyle = g; ctx.fill();
+  const streak = (x0, x1, y, th) => {                  // thin, pointed at the outer end
+    const out = Math.abs(x1) > Math.abs(x0) ? x1 : x0, inn = out === x1 ? x0 : x1;
+    ctx.beginPath();
+    ctx.moveTo(inn, y - th / 2); ctx.lineTo(out, y); ctx.lineTo(inn, y + th / 2);
+    ctx.closePath(); ctx.fillStyle = "#e3261c"; ctx.fill();
+  };
+  for (const side of [-1, 1]) {
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const y = top + h * (-.15 + (i + r() * .7) / n * 1.3);
+      const th = size * (.012 + r() * .012);
+      const a = w * (.5 + r() * .1), len = w * (.14 + r() * .2);
+      streak(side * a, side * (a + len), y, th);
+    }
+  }
+}
+
 function drawText(area) {
   const lines = textLines();
-  state.textQuad = null;
+  state.textQuad = state.brushQuad = null;
+  hctx.setTransform(1, 0, 0, 1, 0, 0); hctx.clearRect(0, 0, W, H);
   if (!lines.length) return;
-  const crash = state.tpl === "crash";
+  const crash = state.tpl === "crash", nope = state.tpl === "nope", teach = state.tpl === "teach";
   const user = $("tsize").value / 100;
   const maxSize = (lines.length >= 3 ? 132 : 206) * user;
-  const availW = area.w * (crash ? .9 : 1);
   for (const l of lines) {
     ctx.font = `900 100px ${FONT}`;
     const w = textW(ctx, l.text) || 1;
-    l.size = Math.min(maxSize, availW / w * 100 * user);
+    l.size = Math.min(maxSize, area.w / w * 100 * user);
     ctx.font = `900 ${l.size}px ${FONT}`;
     l.width = textW(ctx, l.text);
   }
-  const gap = .08;
-  for (const l of lines) l.h = l.size * TALL;          // drawn height
+  if (crash) {                                         // one letter size for every line, set by the longest
+    const s = Math.min(...lines.map(l => l.size));
+    for (const l of lines) { l.width *= s / l.size; l.size = s; }
+  }
+  if (nope && lines.length > 1) {                      // the last line is the big one; the rest stay about half its size
+    const big = lines[lines.length - 1].size;
+    for (const l of lines.slice(0, -1)) {
+      if (l.size <= big * .55) continue;
+      l.width *= big * .55 / l.size; l.size = big * .55;
+    }
+  }
+  const gap = nope ? .2 : .08;
+  // "teach": the last line is drawn taller than the rest, as on the original
+  // (first line about as tall as wide, second about 1.2 times)
+  lines.forEach((l, i) => { l.tall = TALL * (teach && lines.length > 1 && i === lines.length - 1 ? 1.2 : 1); l.h = l.size * l.tall; });
   let total = 0;
   for (const l of lines) total += l.h * (1 + gap);
   const cx = area.x + area.w / 2 + state.tx;
   const brushOn = $("brush").checked;
-  const cy = H / 2 - (brushOn && !crash ? 25 : 0) + state.ty;
+  const cy = H / 2 - (brushOn && teach ? 40 : 0) + state.ty;
 
   state.textPivot = [cx, cy];
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate($("trot").value * Math.PI / 180);         // the user's own rotation
   // the lettering leans right and climbs toward the right edge
-  if (crash) { ctx.rotate(-6.5 * Math.PI / 180); ctx.transform(1, 0, -.1, 1, 0, 0); }
-  else { ctx.rotate(-2 * Math.PI / 180); ctx.transform(1, 0, -.13, 1, 0, 0); }
+  // (the "nope" lettering stands upright)
+  if (crash) ctx.rotate(-7 * Math.PI / 180);          // (its slant is per line, in drawLine)
+  else if (teach) { ctx.rotate(-2 * Math.PI / 180); ctx.transform(1, 0, -.13, 1, 0, 0); }
   let y = -total / 2;
   const tops = lines.map(l => { const t = y; y += l.h * (1 + gap); return t; });
   const last = lines[lines.length - 1], lastTop = tops[tops.length - 1];
   {                                                    // remember the block's outline for clicking and dragging
-    const m = ctx.getTransform(), hw = Math.max(...lines.map(l => l.width)) / 2 + 14;
-    const t = -total / 2 - 8, b = total / 2 + (brushOn && !crash ? last.h * .35 : 0);
+    const lean = crash ? CRASH_SLANT * Math.max(...lines.map(l => l.h)) / 2 : 0;
+    const m = ctx.getTransform(), hw = Math.max(...lines.map(l => l.width)) / 2 + 14 + lean;
+    const t = -total / 2 - 8, b = total / 2 + 8;
     state.textQuad = [[-hw, t], [hw, t], [hw, b], [-hw, b]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
   }
 
-  lines.forEach((l, i) => drawLine(l, 0, tops[i], "cloud"));
-  if (brushOn && crash) {                              // torn red band behind the last line
+  // crash lines line up on the left, the others are centred
+  const maxW = Math.max(...lines.map(l => l.width));
+  const xs = lines.map(l => (crash ? (l.width - maxW) / 2 : 0));
+  lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "cloud"));
+  const paint = brushImgs.crash;
+  if (brushOn && crash && paint?.complete && paint.naturalWidth) {   // red paint stroke behind the last line
     ctx.save();
-    // A wide red band, taller than the letters, over a deep red stroke that
-    // shows at its rims and through its dry gaps as shadow.
-    const bl = last.width + last.size * 1.2, bt = last.h * 1.12;
-    ctx.translate(-last.width / 2 - last.size * .5, lastTop + last.h * .56);
-    ctx.save();
-    ctx.translate(last.size * .05, last.size * .07);
-    brush(bl, bt * 1.03, 5, false, [128, 6, 14]);
-    ctx.restore();
-    brush(bl, bt, 11, false, [236, 16, 24], 1);
+    // painted stroke (backgrounds.js): its body runs through (580, 320) of the
+    // 1100-wide image, about 1040 px long and 300 px thick, climbing ~14° to the right.
+    // It is sized to the last line: about as long as the line and as thick as the letters.
+    const k = last.width / 1040, u = paint.naturalWidth / 1100;
+    ctx.translate((last.width - maxW) / 2 + last.width * .02, lastTop + last.h * .56);
+    userBrush(0, 0);
+    rememberBrush(-520 * k, -150 * k, 520 * k, 150 * k);   // outline, along the text
+    ctx.rotate(14 * Math.PI / 180);                     // undo the stroke's own climb: it runs along the text
+    ctx.scale(k / u, k / u);
+    ctx.drawImage(paint, -580 * u, -320 * u);
     ctx.restore();
   }
-  lines.forEach((l, i) => drawLine(l, 0, tops[i], "ink"));
-  if (brushOn && !crash) {                             // underline swoosh, undoing the lean of the text
+  if (brushOn && nope) {
+    ctx.save();
+    const top = lastTop + last.h * .6, h = last.h * .35;
+    userBrush(0, top + h / 2);
+    const block = brushImgs.nope;
+    if (block?.complete && block.naturalWidth) {
+      // painted block (backgrounds.js): as shares of the picture, its solid body runs
+      // x .16–.84 and y .39–.61, the streaks x .035–.98 and the ragged edges y .35–.64.
+      // The body is stretched over the lower part of the letters, a bit wider than them.
+      const bw = block.naturalWidth, bh = block.naturalHeight;
+      const sx = last.width * 1.3 / (.68 * bw), sy = h * 1.1 / (.24 * bh);
+      const x0 = -.5 * bw * sx, y0 = top + h / 2 - .497 * bh * sy;
+      rememberBrush(x0 + .035 * bw * sx, y0 + .35 * bh * sy, x0 + .98 * bw * sx, y0 + .64 * bh * sy);
+      ctx.shadowColor = "rgba(0,0,0,.75)"; ctx.shadowBlur = h * .3; ctx.shadowOffsetY = h * .25;  // dark smudge below
+      ctx.drawImage(block, x0, y0, bw * sx, bh * sy);
+    } else {
+      rememberBrush(-last.width * .86, top - h * .2, last.width * .86, top + h * 1.4);
+      speedLines(last.width, top, h, last.size, 31);
+    }
+    ctx.restore();
+  }
+  lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "ink"));
+  if (brushOn && teach) {                             // underline swoosh, undoing the lean of the text
     ctx.save();
     ctx.transform(1, 0, .13, 1, 0, 0);
     ctx.translate(-last.width / 2 + last.width * .13, lastTop + last.h * 1.33);
-    brush(last.width * .86, last.size * .23, 23, true);
+    const len = last.width * .86, thick = last.size * .23;
+    userBrush(len / 2, -thick * .7);
+    rememberBrush(-8, -thick * 2.1, len + 8, thick * .7);
+    brush(len, thick, 23, true);
     ctx.restore();
   }
   ctx.restore();
+}
+
+// The user's own move and resize of the brush: (brx, bry) is in screen pixels,
+// the size slider scales it about (cx, cy) of the current drawing frame.
+function userBrush(cx, cy) {
+  const m = ctx.getTransform();
+  ctx.setTransform(m.a, m.b, m.c, m.d, m.e + state.brx, m.f + state.bry);
+  const s = $("brsize").value / 100;
+  ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+}
+// remember where the brush landed on screen, for clicking and dragging it
+function rememberBrush(x0, y0, x1, y1) {
+  const m = ctx.getTransform();
+  state.brushQuad = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
 }
 
 // ---------- render ----------
@@ -834,10 +1015,11 @@ function render() {
 
 // ---------- click, drag and resize on the picture ----------
 const ov = $("ov"), octx = ov.getContext("2d");
-const sel = { what: null, mode: null };                // what: "text" | "portrait" | "bg"
+const sel = { what: null, mode: null };                // what: "text" | "brush" | "portrait" | "bg"
 
 function corners(what) {
   if (what === "text") return state.textQuad;
+  if (what === "brush") return state.brushQuad;
   const b = what === "bg" ? bgBox() : portraitBox();
   return b && [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
 }
@@ -903,12 +1085,16 @@ function onHandle(p) {
   return q.some(c => { const [x, y] = handle(c); return Math.hypot(x - p[0], y - p[1]) < tol; });
 }
 function hit(p) {
+  // on the letters themselves it is the text; on the brush around them, the brush
+  const x = Math.round(p[0]), y = Math.round(p[1]);
+  if (x >= 0 && y >= 0 && x < W && y < H && hctx.getImageData(x, y, 1, 1).data[3] > 0) return "text";
+  if (state.brushQuad && inPoly(p, state.brushQuad)) return "brush";
   if (state.textQuad && inPoly(p, state.textQuad)) return "text";
   const q = corners("portrait");
   if (q && inPoly(p, q)) return "portrait";
   return inPoly(p, corners("bg")) ? "bg" : null;
 }
-const sizeInput = what => $({ text: "tsize", portrait: "psize", bg: "bsize" }[what]);
+const sizeInput = what => $({ text: "tsize", brush: "brsize", portrait: "psize", bg: "bsize" }[what]);
 function setSize(what, v) {
   const el = sizeInput(what);
   if (what === "portrait" && portraitBox()) {          // grow from the middle, not from the corner
@@ -921,6 +1107,7 @@ function setSize(what, v) {
 function moveBy(what, dx, dy) {
   if (what === "text") { state.tx += dx; state.ty += dy; }
   else if (what === "bg") { state.bgx += dx; state.bgy += dy; }
+  else if (what === "brush") { state.brx += dx; state.bry += dy; }
   else { state.pdx += dx; state.pdy += dy; }
 }
 let queued = false;
@@ -994,8 +1181,8 @@ function initDirect() {
     redrawSoon();
   });
   $("resetPos").addEventListener("click", () => {
-    state.tx = state.ty = state.pdx = state.pdy = state.bgx = state.bgy = 0;
-    $("tsize").value = 100; $("psize").value = 100; $("bsize").value = 100; $("trot").value = 0;
+    state.tx = state.ty = state.pdx = state.pdy = state.bgx = state.bgy = state.brx = state.bry = 0;
+    $("tsize").value = 100; $("brsize").value = 100; $("psize").value = 100; $("bsize").value = 100; $("trot").value = 0;
     render();
   });
 }
@@ -1007,8 +1194,9 @@ function seg(id, key) {
   box.addEventListener("click", e => {
     const v = e.target.dataset && e.target.dataset.v;
     if (!v) return;
+    const prev = state[key];
     state[key] = v;
-    if (key === "tpl") applyTemplateDefaults();
+    if (key === "tpl") applyTemplateDefaults(prev);
     sync(); render();
   });
   sync();
@@ -1019,6 +1207,7 @@ function seg(id, key) {
 const PRESET = {
   teach: [["輪到你", "white"], ["教育我了？", "yellow"]],
   crash: [["AI教育", "white"], ["翻車了？", "yellow"]],
+  nope: [["想玩GTA6？", "white"], ["免談", "yellow"]],
 };
 function presetText(tpl) { return PRESET[tpl].map(l => l[0]).join("\n"); }
 function setText(text, cols) {
@@ -1031,9 +1220,11 @@ function usePreset(tpl) {
   PRESET[tpl].forEach(([t, c], i) => { for (let j = 0; j < t.length + (i < PRESET[tpl].length - 1 ? 1 : 0); j++) cols.push(c); });
   setText(presetText(tpl), cols);
 }
-function applyTemplateDefaults() {
-  // only swap the sample text if the user hasn't typed their own
+function applyTemplateDefaults(prev) {
+  // only swap the sample text if the user hasn't typed their own,
+  // and the background only if it is still the old template's own
   if (Object.keys(PRESET).some(k => presetText(k) === state.text)) usePreset(state.tpl);
+  if (state.backdrop === TPL_BG[prev]) { state.backdrop = TPL_BG[state.tpl]; syncBgs(); }
 }
 
 // ---------- headline box ----------
@@ -1102,14 +1293,47 @@ function loadFile(file, cb) {
   fr.readAsDataURL(file);
 }
 
+let paintTiles = () => {};
+function syncBgs() {
+  document.querySelectorAll("#bgs button").forEach(b => b.classList.toggle("on", !state.bg && b.dataset.v === state.backdrop));
+}
+function initBackdrops() {
+  const tiles = BACKDROPS.map(([key, label]) => {
+    const b = document.createElement("button");
+    b.dataset.v = key; b.title = label; b.setAttribute("aria-label", label);
+    const c = document.createElement("canvas"); c.width = 160; c.height = 90;
+    b.append(c);
+    b.addEventListener("click", () => { state.bg = null; $("bg").value = ""; state.backdrop = key; syncBgs(); setBgFit(false); });
+    $("bgs").append(b);
+    return { key, c };
+  });
+  paintTiles = () => tiles.forEach(({ key, c }) => {
+    const g = c.getContext("2d");
+    g.setTransform(c.width / W, 0, 0, c.height / H, 0, 0);
+    paintBackdrop(g, key, W * .25);
+  });
+  for (const [key, src] of Object.entries(window.BRUSHES || {})) {
+    const im = new Image();
+    im.onload = () => render();
+    im.src = src; brushImgs[key] = im;
+  }
+  for (const [key, src] of Object.entries(window.BACKGROUNDS || {})) {
+    const im = new Image();
+    im.onload = () => { paintTiles(); render(); };
+    im.src = src; bgPhotos[key] = im;
+  }
+  paintTiles(); syncBgs();
+}
+
 function say(t) { $("msg").textContent = t; clearTimeout(say.t); say.t = setTimeout(() => $("msg").textContent = "", 2500); }
 
 let syncSide;
 function init() {
   initEditor();
   usePreset("teach");
-  ["brush", "tsize", "trot", "flip", "psize", "bsize"].forEach(id => $(id).addEventListener("input", render));
+  ["brush", "brsize", "tsize", "trot", "flip", "psize", "bsize"].forEach(id => $(id).addEventListener("input", render));
   initDirect();
+  initBackdrops();
   seg("tpl", "tpl");
   syncSide = seg("side", "side");
 
@@ -1132,8 +1356,8 @@ function init() {
   $("up").addEventListener("change", e => loadFile(e.target.files[0], im => { state.custom = im; syncThumbs(); render(); }));
   $("bgBtn").addEventListener("click", () => $("bg").click());
   // a tall or square picture starts fully visible; a wide one fills the frame
-  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; setBgFit(im.width / im.height < 1.2); }));
-  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; setBgFit(false); });
+  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; syncBgs(); setBgFit(im.width / im.height < 1.2); }));
+  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; state.backdrop = TPL_BG[state.tpl]; syncBgs(); setBgFit(false); });
   $("bgFill").addEventListener("click", () => setBgFit(false));
   $("bgFit").addEventListener("click", () => setBgFit(true));
   $("bgBlurFill").addEventListener("change", render);

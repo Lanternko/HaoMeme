@@ -4,9 +4,16 @@ Usage (needs `pip install "rembg[cpu]" pillow numpy`):
     python tools/cutout.py            # all portraits
     python tools/cutout.py A F        # only these keys
 
-All coordinates are full-frame pixels of the 1280x720 thumbnail.
+All coordinates are full-frame pixels of the 1280x720 thumbnail, or of the
+photo itself for entries that name a `file`.
 
 Each entry:
+  vid      YouTube id of the thumbnail in src_thumbs/, or
+  file     a photo path relative to the repo (src_photos/...)
+  scale    optional: shrink the finished cutout by this factor (big photos)
+  fill     optional: the page stretches every portrait to the full height, so a
+           photo framed tight on the face comes out too big; empty space is added
+           above the head until the person takes this share of the height
   crop     region handed to the background remover
   kill     polygons over the headline text; forced transparent
   restore  the body outline where the text hides it (usually a shoulder),
@@ -67,6 +74,13 @@ PORTRAITS = {
     "H": dict(vid="say5cFD5rLg", crop=(0, 0, 720, 720),
               kill=[[(560, 120), (720, 120), (720, 720), (686, 720), (680, 680), (660, 620), (630, 570), (580, 525),
                      (560, 512)]]),
+    # clean photos without a headline: nothing to wipe, just shrink to thumbnail scale
+    "J": dict(file="src_photos/hoodie.jpg", crop=(980, 0, 2000, 1128), scale=.64),
+    "K": dict(file="src_photos/yell.jpg", crop=(0, 0, 2000, 1204), scale=.6),
+    # the thumbnail's frame, widened outward so the face is not so close up
+    "L": dict(file="src_photos/stare.webp", crop=(0, 0, 1069, 1008), scale=.7, fill=.88),
+    "M": dict(vid="75WuZGfMK9c", crop=(480, 0, 1280, 720),
+              kill=[[(480, 0), (805, 0), (805, 472), (480, 472)]]),       # headline and subtitle
     "I": dict(vid="g6ZJ36JSn_c", crop=(800, 0, 1280, 720),
               kill=[[(800, 170), (907, 170), (907, 500), (800, 500)]],
               restore=[[(918, 316), (900, 328), (880, 350), (855, 390), (840, 430), (833, 470), (830, 500), (907, 500), (907, 325)]],
@@ -117,7 +131,8 @@ def main(keys):
         p = PORTRAITS[key]
         crop, model = p["crop"], p.get("model", MODEL)
         session = sessions.setdefault(model, new_session(model))
-        im = Image.open(SRC / f"{p['vid']}.jpg").convert("RGB").crop(crop)
+        src = ROOT / p["file"] if "file" in p else SRC / f"{p['vid']}.jpg"
+        im = Image.open(src).convert("RGB").crop(crop)
         cut = remove(im, session=session, post_process_mask=True)
         alpha = np.asarray(cut.getchannel("A")).astype(np.float32) / 255
         rgb = np.asarray(im).astype(np.float32)
@@ -160,6 +175,12 @@ def main(keys):
         out.putalpha(a)
         bbox = a.point(lambda v: 255 if v > 8 else 0).getbbox()
         out = out.crop(bbox)
+        if "scale" in p:
+            out = out.resize((round(out.width * p["scale"]), round(out.height * p["scale"])), Image.LANCZOS)
+        if "fill" in p:
+            pad = Image.new("RGBA", (out.width, round(out.height / p["fill"])))
+            pad.paste(out, (0, pad.height - out.height))
+            out = pad
         out.save(OUT / f"{key}.png")
         print(key, out.size, "offset", (crop[0] + bbox[0], crop[1] + bbox[1]))
 
