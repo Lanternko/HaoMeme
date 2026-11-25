@@ -1138,17 +1138,38 @@ function init() {
   $("bgFit").addEventListener("click", () => setBgFit(true));
   $("bgBlurFill").addEventListener("change", render);
 
-  $("dl").addEventListener("click", () => cv.toBlob(blob => {
+  const fileName = () => (state.text.replace(/\s+/g, "") || "meme").replace(/[\\/:*?"<>|]/g, "") + ".png";
+  // built synchronously so iOS still treats the share sheet as part of the tap
+  function pngFile() {
+    const bin = atob(cv.toDataURL("image/png").split(",")[1]);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return new File([buf], fileName(), { type: "image/png" });
+  }
+  function download(blob) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const name = state.text.replace(/\s+/g, "") || "meme";
-    a.download = name.replace(/[\\/:*?"<>|]/g, "") + ".png";
+    a.download = fileName();
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }, "image/png"));
-  $("copy").addEventListener("click", () => cv.toBlob(async blob => {
+  }
+  // iPhone / iPad: open the share sheet, whose 「儲存影像」 puts the picture straight into Photos.
+  // Android already drops downloads into the gallery, and desktop keeps the plain download.
+  const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const TO_PHOTOS = IOS && !!navigator.canShare && navigator.canShare({ files: [new File([""], "x.png", { type: "image/png" })] });
+  if (TO_PHOTOS) $("dl").textContent = "存到照片";
+  $("dl").addEventListener("click", async () => {
+    if (!TO_PHOTOS) { cv.toBlob(download, "image/png"); return; }
+    const file = pngFile();
+    say("選「儲存影像」就會存進照片");
+    try { await navigator.share({ files: [file] }); }
+    catch (e) { if (e.name !== "AbortError") download(file); }
+  });
+  // hand the clipboard a promise inside the tap itself: Safari refuses a write that starts after an await
+  $("copy").addEventListener("click", async () => {
+    const blob = new Promise(res => cv.toBlob(res, "image/png"));
     try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); say("已複製"); }
-    catch (e) { say("這個瀏覽器不能直接複製，請按下載"); }
-  }, "image/png"));
+    catch (e) { say(`這個瀏覽器不能直接複製，請按${$("dl").textContent}`); }
+  });
 
   render();
   // redraw once the heavy font is actually ready
