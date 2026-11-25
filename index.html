@@ -657,8 +657,8 @@ function fillFor(color, top, size) {
     } else {                                           // lemon on top, warming to orange-yellow at the foot
       g.addColorStop(0, "#fcfb05"); g.addColorStop(.42, "#fcf805"); g.addColorStop(.75, "#fcd405"); g.addColorStop(1, "#f9b108");
     }
-  } else {
-    g.addColorStop(0, "#ff5a4a"); g.addColorStop(.5, "#f3101c"); g.addColorStop(1, "#b00008");
+  } else {                                             // flat red, as on the covers: a little orange on words, pure red on ?!
+    return color === "redmark" ? "#f40404" : "#fc3328";
   }
   return g;
 }
@@ -794,10 +794,18 @@ function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
     }
     // each colour run is drawn from its own spot along the line
     const left = -line.width / 2;
-    const runs = line.runs.map(r => ({ ...r, x: left + textW(ctx, text.slice(0, r.start)), fill: fillFor(r.color, -size * BASE, size) }));
+    // On the covers a red ? or ! stands alone: chunkier, with a white rim inside
+    // the black outline. A whole red word has the black outline only.
+    const runs = line.runs.map(r => {
+      const mark = r.color === "red" && /^[?!]+$/.test(r.text);
+      return { ...r, mark, fat: mark ? size * .035 : 0,
+               x: left + textW(ctx, text.slice(0, r.start)), fill: fillFor(mark ? "redmark" : r.color, -size * BASE, size) };
+    });
     ctx.textAlign = "left";
-    for (const r of runs) if (r.color === "red") {      // red text gets a white rim
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = bold + sw * .5;
+    for (const r of runs) if (r.mark) {
+      ctx.strokeStyle = "#000"; ctx.lineWidth = sw + r.fat;   // keep the outline outside the fattened mark
+      put(ctx, true, r.text, r.x, 0);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = bold + r.fat + sw * .5;
       put(ctx, true, r.text, r.x, 0);
     }
     if (state.tpl === "crash") {
@@ -812,7 +820,7 @@ function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
       lctx.font = ctx.font; lctx.textAlign = "left"; lctx.textBaseline = "alphabetic"; lctx.lineJoin = "round";
       lctx.lineWidth = bold;
       for (const r of runs) {
-        lctx.fillStyle = lctx.strokeStyle = r.fill;
+        lctx.fillStyle = lctx.strokeStyle = r.fill; lctx.lineWidth = bold + r.fat;
         put(lctx, true, r.text, r.x, 0); put(lctx, false, r.text, r.x, 0);
       }
       // Bristle marks: a few short streaks, all running roughly along the line
@@ -853,8 +861,8 @@ function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
       lctx.drawImage(layer2, 0, 0);
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(layer, 0, 0); ctx.restore();
     } else {
-      ctx.lineWidth = bold;                            // fatten the letters: the originals use a heavier face
       for (const r of runs) {
+        ctx.lineWidth = bold + r.fat;                  // fatten the letters: the originals use a heavier face
         ctx.fillStyle = ctx.strokeStyle = r.fill;
         put(ctx, true, r.text, r.x, 0);
         put(ctx, false, r.text, r.x, 0);
