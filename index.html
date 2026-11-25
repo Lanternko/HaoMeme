@@ -130,13 +130,20 @@
   .bgs { grid-template-columns: repeat(5, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
   .bgs canvas { height: 100%; }
+  /* the last tile holds the uploaded picture; dashed while empty */
+  .thumbs button.up { background: transparent; border: 1px dashed var(--text-dim); }
+  .thumbs button.up.has { border-style: solid; }
+  .bgs button.up img { object-position: center; }
   #side { flex: 1; }
 
   footer p { margin: 0; padding: 20px 0 40px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
-  /* GitHub link: a squarish beige button with blue text */
-  footer a { display: inline-block; margin: 0 4px; padding: 5px 12px; border-radius: 5px; background: #ece3cf; color: #1d5bb8;
-             font-weight: 700; text-decoration: none; transition: background 120ms var(--ease), color 120ms var(--ease); }
-  footer a:hover, footer a:focus-visible { background: #1d5bb8; color: #ece3cf; }
+  /* GitHub link: a small button in the page's own style (like 複製圖片) */
+  footer a { display: inline-block; margin: 0 4px; padding: 4px 12px; border-radius: var(--r-sm);
+             background: var(--surface-raised); border: 1px solid var(--border-strong); box-shadow: 0 1px 0 rgba(0, 0, 0, .5);
+             color: var(--text); font-weight: 700; text-decoration: none;
+             transition: background 120ms var(--ease), border-color 120ms var(--ease); }
+  footer a:hover, footer a:focus-visible { background: #20242a; border-color: rgba(255, 255, 255, .28); }
+  footer a:active { transform: translateY(1px); box-shadow: none; }
 
   @media (max-width: 980px) { main { grid-template-columns: 1fr; } .preview { position: static; } }
   /* phone: the preview stays pinned at the top while the controls scroll under it */
@@ -227,10 +234,10 @@
       <div class="thumbs bgs" id="bgs"></div>
       <div class="row">
         <button id="bgBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳背景圖</button>
-        <button id="bgClear">用預設</button>
         <input type="file" id="bg" accept="image/*" hidden>
       </div>
       <label>背景大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
+      <label>背景虛化 <input type="range" id="bblur" min="0" max="30" value="0"></label>
       <div class="row">
         <button id="bgFill">填滿畫面</button>
         <button id="bgFit">完整顯示</button>
@@ -259,7 +266,7 @@ const FONT = '"Hao Title", "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", 
 // background were dragged from their default spots; textQuad is where the text
 // block landed on screen and textPivot the point it rotates around.
 // text is the headline (lines split by \n); cols holds one colour per character.
-const state = { tpl: "teach", backdrop: "red", portrait: 0, side: "left", custom: null, bg: null, imgs: [],
+const state = { tpl: "teach", backdrop: "red", portrait: 0, side: "left", custom: null, upPortrait: null, bg: null, upBg: null, imgs: [],
                 tx: 0, ty: 0, pdx: 0, pdy: 0, bgx: 0, bgy: 0, brx: 0, bry: 0, textQuad: null, textPivot: null, brushQuad: null,
                 text: "", cols: [] };
 
@@ -299,7 +306,7 @@ function setBgFit(fit) {
 }
 
 // built-in backgrounds; each template starts on its own one
-const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"], ["white", "白牆"]];
+const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"]];
 const TPL_BG = { teach: "red", crash: "grey", nope: "dark" };
 const bgPhotos = {};                                   // photo backgrounds from backgrounds.js, by key
 const brushImgs = {};                                  // painted strokes from backgrounds.js, by template
@@ -343,11 +350,6 @@ function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
     glow(g, 1110, 640, 360, 170, "112,94,76", .45);
     glow(g, 60, 620, 260, 200, "86,74,62", .5);
     glow(g, 760, 360, 560, 330, "0,0,0", .85);
-  } else if (kind === "white") {
-    // a plain studio wall, a touch darker toward the corners
-    const b = g.createRadialGradient(W / 2, H * .42, 80, W / 2, H / 2, 820);
-    b.addColorStop(0, "#ffffff"); b.addColorStop(1, "#dcdcd8");
-    g.fillStyle = b; g.fillRect(0, 0, W, H);
   } else {
     const im = bgPhotos[kind];
     g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
@@ -408,7 +410,52 @@ function drawBackground(personCx) {
     ctx.drawImage(fog, 0, 0);
     ctx.drawImage(buf, vx0, vy0, vw, vh, vx0, vy0, vw, vh);     // the sharp background back on top
   }
+  const blur = +$("bblur").value;
+  if (blur > 0) blurFrame(blur);
   drawFrameShade();
+}
+
+// blur everything drawn so far (the background), out of focus like a camera.
+// The frame's edge pixels are stretched outward first, so the blur doesn't
+// pull black in from beyond the edge.
+function blurFrame(px) {
+  const m = Math.ceil(px * 2.5);
+  let pad = blurFrame.pad;
+  if (!pad || pad.width !== W + 2 * m) pad = blurFrame.pad = Object.assign(document.createElement("canvas"), { width: W + 2 * m, height: H + 2 * m });
+  const p = pad.getContext("2d");
+  p.drawImage(cv, m, m);
+  p.drawImage(cv, 0, 0, W, 1, m, 0, W, m);                   // top, bottom, left, right
+  p.drawImage(cv, 0, H - 1, W, 1, m, m + H, W, m);
+  p.drawImage(cv, 0, 0, 1, H, 0, m, m, H);
+  p.drawImage(cv, W - 1, 0, 1, H, m + W, m, m, H);
+  p.drawImage(cv, 0, 0, 1, 1, 0, 0, m, m);                   // corners
+  p.drawImage(cv, W - 1, 0, 1, 1, m + W, 0, m, m);
+  p.drawImage(cv, 0, H - 1, 1, 1, 0, m + H, m, m);
+  p.drawImage(cv, W - 1, H - 1, 1, 1, m + W, m + H, m, m);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if ("filter" in CanvasRenderingContext2D.prototype) {
+    ctx.filter = `blur(${px}px)`;
+    ctx.drawImage(pad, -m, -m);
+  } else {
+    // no canvas blur (older Safari): shrink the picture and stretch it back,
+    // halving one step at a time so the result stays smooth
+    let src = pad, w = pad.width, h = pad.height;
+    const target = Math.max(1, px / 2);
+    blurFrame.steps = blurFrame.steps || [];
+    for (let i = 0, f = 1; f < target; i++) {
+      const k = Math.min(2, target / f); f *= k;
+      w = Math.max(1, Math.round(w / k)); h = Math.max(1, Math.round(h / k));
+      const c = blurFrame.steps[i] || (blurFrame.steps[i] = document.createElement("canvas"));
+      c.width = w; c.height = h;
+      const g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+      g.drawImage(src, 0, 0, w, h);
+      src = c;
+    }
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, w, h, -m, -m, pad.width, pad.height);
+  }
+  ctx.restore();
 }
 
 // the background itself, inside its own box (everything else is left black)
@@ -435,7 +482,7 @@ function drawFrameShade() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   } else {
     const v = ctx.createRadialGradient(W / 2, H / 2, 380, W / 2, H / 2, 800);
-    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, `rgba(0,0,0,${state.backdrop === "white" ? .12 : .55})`);
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
   }
 }
@@ -462,10 +509,10 @@ function portraitBox() {
   return { img, x, y: H - (a.y + a.h) * scale + dy, w, h };
 }
 
-function drawPortrait(b) {
+function drawPortrait(b, ctx = cv.getContext("2d"), bare = false) {   // bare: no drop shadow
   if (!b) return;
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 12;
+  if (!bare) { ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 12; }
   if ($("flip").checked) {
     ctx.translate(b.x + b.w, b.y); ctx.scale(-1, 1);
     ctx.drawImage(b.img, 0, 0, b.w, b.h);
@@ -622,6 +669,9 @@ const l2 = layer2.getContext("2d");
 const hitLayer = document.createElement("canvas");  // where the letters are, for telling text from brush on a click
 hitLayer.width = W; hitLayer.height = H;
 const hctx = hitLayer.getContext("2d", { willReadFrequently: true });
+const glowLayer = document.createElement("canvas");  // the black glow where it lies over the person
+glowLayer.width = W; glowLayer.height = H;
+const gctx = glowLayer.getContext("2d");
 const layer3 = document.createElement("canvas");    // the letters shrunk inward: their "core"
 layer3.width = W; layer3.height = H;
 const l3 = layer3.getContext("2d");
@@ -682,7 +732,7 @@ function put(c, stroke, text, x, y) {                  // strokeText / fillText 
 // pass "cloud": black that fades out around the letters.
 // pass "ink": outline, hard drop shadow and the coloured fill.
 // line: { text, size, width, runs: [{ text, color, start }] } (start = index in text)
-function drawLine(line, cx, top, pass) {
+function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
   const { text, size } = line;
   ctx.save();
   ctx.translate(cx, top);
@@ -877,10 +927,15 @@ function speedLines(w, top, h, size, seed) {
   }
 }
 
-function drawText(area) {
+// Drawn in two passes around the portrait: "brush" puts the black glow and the
+// red paint down first, so where they meet the person they go behind them;
+// "text" then draws the lettering on top of everything, plus the glow again
+// where it lies over the person (so the letters still stand out there).
+// Both passes lay the lines out the same way.
+function drawText(area, pass, person) {
   const lines = textLines();
-  state.textQuad = state.brushQuad = null;
-  hctx.setTransform(1, 0, 0, 1, 0, 0); hctx.clearRect(0, 0, W, H);
+  if (pass === "brush") state.brushQuad = null;
+  else { state.textQuad = null; hctx.setTransform(1, 0, 0, 1, 0, 0); hctx.clearRect(0, 0, W, H); }
   if (!lines.length) return;
   const crash = state.tpl === "crash", nope = state.tpl === "nope", teach = state.tpl === "teach";
   const user = $("tsize").value / 100;
@@ -934,20 +989,36 @@ function drawText(area) {
   // crash lines line up on the left, the others are centred
   const maxW = Math.max(...lines.map(l => l.width));
   const xs = lines.map(l => (crash ? (l.width - maxW) / 2 : 0));
+  if (pass === "text") {
+    if (person) {                                       // glow over the person: drawn apart, cut to the person's shape
+      gctx.setTransform(1, 0, 0, 1, 0, 0);
+      gctx.clearRect(0, 0, W, H);
+      gctx.setTransform(ctx.getTransform());
+      lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "cloud", gctx));
+      gctx.setTransform(1, 0, 0, 1, 0, 0);
+      gctx.globalCompositeOperation = "destination-in";
+      drawPortrait(person, gctx, true);
+      gctx.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(glowLayer, 0, 0); ctx.restore();
+    }
+    lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "ink"));
+    ctx.restore();
+    return;
+  }
   lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "cloud"));
   const paint = brushImgs.crash;
   if (brushOn && crash && paint?.complete && paint.naturalWidth) {   // red paint stroke behind the last line
     ctx.save();
-    // painted stroke (backgrounds.js): its body runs through (580, 320) of the
-    // 1100-wide image, about 1040 px long and 300 px thick, climbing ~14° to the right.
+    // painted stroke (backgrounds.js): its body runs through (565, 231) of the
+    // 1100-wide image, about 830 px long and 240 px thick, climbing ~13.6° to the right.
     // It is sized to the last line: about as long as the line and as thick as the letters.
-    const k = last.width / 1040, u = paint.naturalWidth / 1100;
+    const k = last.width / 830, u = paint.naturalWidth / 1100;
     ctx.translate((last.width - maxW) / 2 + last.width * .02, lastTop + last.h * .56);
     userBrush(0, 0);
-    rememberBrush(-520 * k, -150 * k, 520 * k, 150 * k);   // outline, along the text
-    ctx.rotate(14 * Math.PI / 180);                     // undo the stroke's own climb: it runs along the text
+    rememberBrush(-415 * k, -120 * k, 415 * k, 120 * k);   // outline, along the text
+    ctx.rotate(13.6 * Math.PI / 180);                   // undo the stroke's own climb: it runs along the text
     ctx.scale(k / u, k / u);
-    ctx.drawImage(paint, -580 * u, -320 * u);
+    ctx.drawImage(paint, -565 * u, -231 * u);
     ctx.restore();
   }
   if (brushOn && nope) {
@@ -971,7 +1042,6 @@ function drawText(area) {
     }
     ctx.restore();
   }
-  lines.forEach((l, i) => drawLine(l, xs[i], tops[i], "ink"));
   if (brushOn && teach) {                             // underline swoosh, undoing the lean of the text
     ctx.save();
     ctx.transform(1, 0, .13, 1, 0, 0);
@@ -1006,10 +1076,11 @@ function render() {
   const personCx = b ? b.x + b.w / 2 : W * .25;
   ctx.clearRect(0, 0, W, H);
   drawBackground(personCx);
-  drawPortrait(b);
   const left = state.side === "left";
   const area = left ? { x: W * .425, w: W * .565 } : { x: W * .01, w: W * .565 };
-  drawText(area);
+  drawText(area, "brush");                            // glow and red paint go behind the person
+  drawPortrait(b);
+  drawText(area, "text", b);
   drawOverlay();
 }
 
@@ -1084,11 +1155,24 @@ function onHandle(p) {
   const tol = 18 * W / cv.getBoundingClientRect().width;
   return q.some(c => { const [x, y] = handle(c); return Math.hypot(x - p[0], y - p[1]) < tol; });
 }
+// is the person (not the empty part of their picture) at x, y?
+const pickCv = document.createElement("canvas");
+pickCv.width = pickCv.height = 1;
+const pickCtx = pickCv.getContext("2d", { willReadFrequently: true });
+function onPerson(x, y) {
+  const b = portraitBox();
+  if (!b) return false;
+  pickCtx.setTransform(1, 0, 0, 1, 0, 0); pickCtx.clearRect(0, 0, 1, 1);
+  pickCtx.setTransform(1, 0, 0, 1, -x, -y);
+  drawPortrait(b, pickCtx, true);
+  return pickCtx.getImageData(0, 0, 1, 1).data[3] > 128;
+}
 function hit(p) {
   // on the letters themselves it is the text; on the brush around them, the brush
+  // (unless the person stands in front of it there)
   const x = Math.round(p[0]), y = Math.round(p[1]);
   if (x >= 0 && y >= 0 && x < W && y < H && hctx.getImageData(x, y, 1, 1).data[3] > 0) return "text";
-  if (state.brushQuad && inPoly(p, state.brushQuad)) return "brush";
+  if (state.brushQuad && inPoly(p, state.brushQuad) && !onPerson(x, y)) return "brush";
   if (state.textQuad && inPoly(p, state.textQuad)) return "text";
   const q = corners("portrait");
   if (q && inPoly(p, q)) return "portrait";
@@ -1283,7 +1367,8 @@ function selectPortrait(i) {
   syncThumbs(); syncSide(); render();
 }
 function syncThumbs() {
-  document.querySelectorAll("#thumbs button").forEach((b, i) => b.classList.toggle("on", !state.custom && i === state.portrait));
+  document.querySelectorAll("#thumbs button").forEach((b, i) =>
+    b.classList.toggle("on", b.id === "upThumb" ? !!state.custom : !state.custom && i === state.portrait));
 }
 
 function loadFile(file, cb) {
@@ -1295,7 +1380,12 @@ function loadFile(file, cb) {
 
 let paintTiles = () => {};
 function syncBgs() {
-  document.querySelectorAll("#bgs button").forEach(b => b.classList.toggle("on", !state.bg && b.dataset.v === state.backdrop));
+  document.querySelectorAll("#bgs button").forEach(b =>
+    b.classList.toggle("on", b.dataset.v ? !state.bg && b.dataset.v === state.backdrop : !!state.bg));
+}
+// a tall or square picture starts fully visible; a wide one fills the frame
+function useUploadedBg() {
+  state.bg = state.upBg; syncBgs(); setBgFit(state.bg.width / state.bg.height < 1.2);
 }
 function initBackdrops() {
   const tiles = BACKDROPS.map(([key, label]) => {
@@ -1307,6 +1397,11 @@ function initBackdrops() {
     $("bgs").append(b);
     return { key, c };
   });
+  // the last tile stays empty until a background is uploaded, then shows it
+  const up = document.createElement("button");
+  up.className = "up"; up.id = "bgUp"; up.title = "上傳背景圖"; up.setAttribute("aria-label", "上傳背景圖");
+  up.addEventListener("click", () => state.upBg ? useUploadedBg() : $("bg").click());
+  $("bgs").append(up);
   paintTiles = () => tiles.forEach(({ key, c }) => {
     const g = c.getContext("2d");
     g.setTransform(c.width / W, 0, 0, c.height / H, 0, 0);
@@ -1331,7 +1426,7 @@ let syncSide;
 function init() {
   initEditor();
   usePreset("teach");
-  ["brush", "brsize", "tsize", "trot", "flip", "psize", "bsize"].forEach(id => $(id).addEventListener("input", render));
+  ["brush", "brsize", "tsize", "trot", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", render));
   initDirect();
   initBackdrops();
   seg("tpl", "tpl");
@@ -1346,6 +1441,14 @@ function init() {
     b.addEventListener("click", () => selectPortrait(i));
     $("thumbs").append(b);
   });
+  // the last tile stays empty until a portrait is uploaded, then shows it
+  const up = document.createElement("button");
+  up.className = "up"; up.id = "upThumb"; up.title = "上傳自己的"; up.setAttribute("aria-label", "上傳自己的");
+  up.addEventListener("click", () => {
+    if (!state.upPortrait) return $("up").click();
+    state.custom = state.upPortrait; syncThumbs(); render();
+  });
+  $("thumbs").append(up);
   syncThumbs();
 
   $("rand").addEventListener("click", () => {
@@ -1353,11 +1456,19 @@ function init() {
     selectPortrait(i);
   });
   $("upBtn").addEventListener("click", () => $("up").click());
-  $("up").addEventListener("change", e => loadFile(e.target.files[0], im => { state.custom = im; syncThumbs(); render(); }));
+  $("up").addEventListener("change", e => loadFile(e.target.files[0], im => {
+    state.upPortrait = state.custom = im;
+    const t = new Image(); t.src = im.src; t.alt = "上傳的人像";
+    $("upThumb").replaceChildren(t); $("upThumb").classList.add("has");
+    syncThumbs(); render();
+  }));
   $("bgBtn").addEventListener("click", () => $("bg").click());
-  // a tall or square picture starts fully visible; a wide one fills the frame
-  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => { state.bg = im; syncBgs(); setBgFit(im.width / im.height < 1.2); }));
-  $("bgClear").addEventListener("click", () => { state.bg = null; $("bg").value = ""; state.backdrop = TPL_BG[state.tpl]; syncBgs(); setBgFit(false); });
+  $("bg").addEventListener("change", e => loadFile(e.target.files[0], im => {
+    state.upBg = im;
+    const t = new Image(); t.src = im.src; t.alt = "上傳的背景";
+    $("bgUp").replaceChildren(t); $("bgUp").classList.add("has");
+    useUploadedBg();
+  }));
   $("bgFill").addEventListener("click", () => setBgFit(false));
   $("bgFit").addEventListener("click", () => setBgFit(true));
   $("bgBlurFill").addEventListener("change", render);

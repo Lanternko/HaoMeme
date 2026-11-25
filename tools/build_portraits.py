@@ -14,20 +14,21 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# key -> (label, side the portrait sits on by default)
+# key -> (label, side the portrait sits on by default), in the order the page
+# shows them: by shirt colour, dark to light. The page keeps a twelfth slot for
+# an uploaded portrait, so eleven are packed (portraits/M.png is left out).
 META = {
-    "A": ("舉手說教", "left"),
-    "C": ("托腮沉思", "left"),
-    "D": ("抱頭驚訝", "left"),
+    "A": ("舉手說教", "left"),       # black
     "E": ("指著你", "right"),
-    "F": ("皺眉托腮", "left"),
-    "G": ("托腮斜眼", "left"),
-    "H": ("握拳", "left"),
-    "I": ("雙手抱胸", "right"),
     "J": ("連帽口罩", "right"),
-    "K": ("閉眼大叫", "left"),
+    "G": ("托腮斜眼", "left"),       # navy
+    "H": ("握拳", "left"),
+    "K": ("閉眼大叫", "left"),       # khaki
+    "F": ("皺眉托腮", "left"),       # beige
     "L": ("傻眼", "left"),
-    "M": ("攤手解釋", "right"),
+    "C": ("托腮沉思", "left"),       # white
+    "D": ("抱頭驚訝", "left"),
+    "I": ("雙手抱胸", "right"),
 }
 
 # where the original cutout sits inside each widened portrait (tools/find_anchors.py)
