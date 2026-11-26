@@ -157,7 +157,7 @@
   .thumbs button.on::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--accent);
     border-radius: inherit; pointer-events: none; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
-  .bgs { grid-template-columns: repeat(5, 1fr); }
+  .bgs { grid-template-columns: repeat(6, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
   .bgs canvas { height: 100%; }
   /* the last tile holds the uploaded picture; dashed while empty */
@@ -187,6 +187,7 @@
     .preview { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 8px 0; }
     .preview .note { display: none; }
     .tpl-seg button { padding: 14px 8px; font-size: 15px; }
+    .bgs { grid-template-columns: repeat(3, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   /* phones: the finished picture, to long-press and save or copy */
@@ -370,8 +371,8 @@ function setBgFit(fit) {
 }
 
 // built-in backgrounds; each template starts on its own one
-const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"]];
-const TPL_BG = { teach: "red", crash: "grey", nope: "dark", sue: "grey" };
+const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"], ["room", "灰色房間"]];
+const TPL_BG = { teach: "red", crash: "grey", nope: "dark", sue: "room" };
 const bgPhotos = {};                                   // photo backgrounds from backgrounds.js, by key
 const brushImgs = {};                                  // painted strokes from backgrounds.js, by template
 
@@ -544,7 +545,7 @@ function drawFrameShade() {
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "rgba(0,0,0,.15)"); g.addColorStop(1, "rgba(0,0,0,.45)");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  } else {
+  } else if (state.backdrop !== "room") {              // the grey room is a photo with its own light: left as it is
     const v = ctx.createRadialGradient(W / 2, H / 2, 380, W / 2, H / 2, 800);
     v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
@@ -571,6 +572,44 @@ function portraitBox() {
   const dx = state.pdx, dy = state.pdy;
   const x = state.side === "left" ? -ax * scale + dx : W - (ax + a.w) * scale + dx;
   return { img, x, y: H - (a.y + a.h) * scale + dy, w, h };
+}
+
+// a spot on the head's outline a little below the crown, on both sides, and the head's
+// width there, in canvas pixels; worked out once per picture from its transparency.
+// null when there is no portrait or it has no see-through background (an uploaded photo)
+const headCache = new WeakMap();
+function headShape(img) {
+  if (headCache.has(img)) return headCache.get(img);
+  const n = 200, sc = n / img.width, h = Math.max(1, Math.round(img.height * sc));
+  const c = Object.assign(document.createElement("canvas"), { width: n, height: h });
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, n, h);
+  const a = g.getImageData(0, 0, n, h).data, solid = (x, y) => a[(y * n + x) * 4 + 3] > 128;
+  let top = -1, cx = 0, hit = null;
+  for (let y = 0; y < h && !hit; y++) {
+    if (top < 0) {
+      let l = -1, r = -1;
+      for (let x = 0; x < n; x++) if (solid(x, y)) { if (l < 0) l = x; r = x; }
+      if (l < 0) continue;
+      if (r - l > n * .9) break;                       // solid from edge to edge: no cut-out
+      top = y; cx = (l + r) >> 1;
+    }
+    if (!solid(cx, y)) continue;
+    let l = cx, r = cx;                                  // the run of the head under the crown, not a hand beside it
+    while (l > 0 && solid(l - 1, y)) l--;
+    while (r < n - 1 && solid(r + 1, y)) r++;
+    if (y - top >= .25 * (r - l + 1)) hit = { y: y / sc, l: l / sc, r: (r + 1) / sc };
+  }
+  headCache.set(img, hit);
+  return hit;
+}
+function headSpot(b) {
+  const hd = b && headShape(b.img);
+  if (!hd) return null;
+  const k = b.w / b.img.width, flip = $("flip").checked;
+  const x = v => b.x + (flip ? b.img.width - v : v) * k;
+  const l = Math.min(x(hd.l), x(hd.r)), r = Math.max(x(hd.l), x(hd.r));
+  return { l, r, w: r - l, y: b.y + hd.y * k };
 }
 
 function drawPortrait(b, ctx = cv.getContext("2d"), bare = false) {   // bare: no drop shadow
@@ -826,7 +865,8 @@ function drawLine(line, cx, top, pass, ctx = cv.getContext("2d")) {
     // Same recipe as a layer-style "outer glow with spread": the outline is
     // redrawn many times, each a little wider and fainter, so the black is
     // solid at the letter and thins out to nothing at a fixed distance.
-    const reach = size * (crashTpl ? .13 : nope ? .16 : .3), steps = 18;
+    // (律師傳票 keeps it tight: on its light grey room only a thin shadow hugs the letters)
+    const reach = size * (crashTpl ? .13 : nope ? .16 : state.tpl === "sue" ? .1 : .3), steps = 18;
     ctx.strokeStyle = "#000";
     ctx.filter = `blur(${Math.max(1, size * .02)}px)`;
     for (let i = 0; i < steps; i++) {
@@ -1021,8 +1061,11 @@ const CLOUD_SIZE = 256;
 // where the 律師傳票 pictures go, in shares of the line they belong to
 // (x, y: centre from the line's middle and top; w, h: size)
 const SUE_SWOOSH = { x: 0, y: 1.17, w: 1.35, h: 1.35, rot: 2 };
-const SUE_SMEAR = { x: -.12, y: .5, w: 1.45, h: 1.5 };
+const SUE_SMEAR = { x: -.04, y: .42, w: 1.6, h: 1.6 };
 const SUE_SPARK = { x: -.02, y: .5, w: .48 };
+// the yellow dashes sit beside the head, on the side facing the text, and point at it
+// (in shares of the head's width: gap from its outline, drop below the spot, picture width)
+const SUE_HEAD = { gap: .04, dy: .06, w: .32 };
 const cloudCache = new Map();
 function cloudLine(l) {
   const key = [l.text, l.tall, state.tpl, $("italic").checked,
@@ -1191,10 +1234,21 @@ function drawText(area, pass, person) {
   // "sue": three short yellow dashes flaring out past the top-right corner of the first line
   function sparks() {
     const f = lines[0], s = f.size;
+    const pic = brushImgs.sueSpark, ready = pic?.complete && pic.naturalWidth;
+    const hd = ready && headSpot(portraitBox());
+    if (hd) {
+      const w = hd.w * SUE_HEAD.w, h = w * pic.naturalHeight / pic.naturalWidth;
+      const onLeft = state.side !== "left";                 // the text is left of the head
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.translate(onLeft ? hd.l - hd.w * SUE_HEAD.gap : hd.r + hd.w * SUE_HEAD.gap, hd.y + hd.w * SUE_HEAD.dy);
+      if (onLeft) ctx.scale(-1, 1);                         // the picture fans out from its lower left
+      ctx.drawImage(pic, 0, -h, w, h);
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.translate(xs[0] + f.width / 2 + s * .12, tops[0] + s * .05);
-    const pic = brushImgs.sueSpark;
-    if (pic?.complete && pic.naturalWidth) {            // painted dashes (backgrounds.js), fanning out from their lower left
+    if (ready) {                                        // no head found: by the first line's top right corner
       const w = s * SUE_SPARK.w, h = w * pic.naturalHeight / pic.naturalWidth;
       ctx.drawImage(pic, s * SUE_SPARK.x, -h + s * SUE_SPARK.y, w, h);
       ctx.restore();

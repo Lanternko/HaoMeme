@@ -29,18 +29,28 @@ def smoke():
     return ImageOps.fit(both, (W, H), Image.LANCZOS)
 
 
-def red_paint(name, solid=1.0):
+def room():
+    """Grey out-of-focus room behind the 律師傳票 cover: Gemini redrew it from
+    the cover with the text, the person and the paint taken out."""
+    im = Image.open(ROOT / "src_photos" / "sue_bg.jpg").convert("RGB")
+    return ImageOps.fit(im, (W, H), Image.LANCZOS)
+
+
+def red_paint(name, solid=1.0, tint=None):
     """Red paint on white: turn the white into transparency.
     The paint is red, so the green channel says how much paint covers a pixel;
     the colour is then the paint with the white taken back out.
     solid: paint this strong or stronger is fully opaque (lower for flat colour,
-    so the dark picture behind does not show through it)."""
+    so the dark picture behind does not show through it).
+    tint: one flat colour for all the paint, keeping only its brush texture."""
     im = Image.open(next((ROOT / "src_photos").glob(name + ".*"))).convert("RGB")
     im = im.resize((1100, round(im.height * 1100 / im.width)), Image.LANCZOS)
     px = np.asarray(im).astype(np.float32) / 255
     a = 1 - np.minimum(px[..., 1], px[..., 2])
     a = np.clip((a - .06) / (solid - .06), 0, 1)                  # paper grain and compression noise
     rgb = (px - (1 - a[..., None])) / np.maximum(a[..., None], 1e-3)
+    if tint:
+        rgb = np.broadcast_to(np.array(tint, np.float32) / 255, rgb.shape)
     out = np.dstack([np.clip(rgb, 0, 1), a])
     return Image.fromarray((out * 255 + .5).astype(np.uint8), "RGBA")
 
@@ -58,11 +68,12 @@ def pack(table, var):
 # brush key -> its picture in src_photos/ (any image type); a missing one is left out
 # and the page falls back to drawing that brush itself
 # (the "sue" pictures were drawn by Gemini after the 律師傳票 cover: the red swoosh
-# under the last line, the black smear behind the first, the three yellow dashes)
+# under the last line, the black smear behind the first, the three yellow dashes;
+# the red is painted over in the cover's brighter red)
 BRUSHES = {"crash": ("red_brush",), "nope": ("nope_block", .9),
-           "sue": ("sue_red",), "sueSmear": ("sue_smear",), "sueSpark": ("sue_spark",)}
+           "sue": ("sue_red", 1.0, (246, 18, 28)), "sueSmear": ("sue_smear",), "sueSpark": ("sue_spark",)}
 
 dst = ROOT / "backgrounds.js"
-dst.write_text(pack({"smoke": smoke}, "BACKGROUNDS") + pack({key: (lambda a=args: red_paint(*a)) for key, args in BRUSHES.items()
+dst.write_text(pack({"smoke": smoke, "room": room}, "BACKGROUNDS") + pack({key: (lambda a=args: red_paint(*a)) for key, args in BRUSHES.items()
                                                        if any((ROOT / "src_photos").glob(args[0] + ".*"))}, "BRUSHES"), encoding="utf-8")
 print(dst)
