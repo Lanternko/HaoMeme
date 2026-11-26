@@ -27,6 +27,12 @@ https://lanternko.github.io/HaoMeme/
 
 輸出圖片為 1280×720。內建人像來自「拆書人」頻道原始封面，是真人肖像，只能私下玩梗，不要拿去冒充本人發文。
 
+## 授權
+
+- **程式碼**：MIT 授權（見 [`LICENSE`](LICENSE)），可以自由使用、修改、轉發，保留版權聲明即可。
+- **圖片不在 MIT 範圍內**：`portraits/`、`portraits_orig/`、`src_photos/`、`src_thumbs/` 裡的人像與截圖、`portraits.js` 和 `backgrounds.js` 內嵌的圖片資料，以及用它們做的截圖與圖示，版權與肖像權屬原作者（YouTube 頻道「拆書人」）。放在這裡只是為了讓工具能用，fork 或轉用時請自行換掉或取得授權。
+- **字型**：`fonts/` 依各自作者的 SIL OFL 1.1 授權（見 `fonts/OFL.txt`）。
+
 ## 給想改程式的人
 
 - **本機執行**：不需架設伺服器，直接用瀏覽器打開 `index.html` 就能跑（人像已打包在 `portraits.js` 中）。
