@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # key -> (label, side the portrait sits on by default), in the order the page
 # shows them: by shirt colour, dark to light. The page keeps one more slot for
-# an uploaded portrait, so twelve are packed (portraits/M.png is left out).
+# an uploaded portrait; portraits/L.png and M.png are left out.
 META = {
     "A": ("舉手說教", "left"),       # black
     "E": ("指著你", "right"),
@@ -26,7 +26,6 @@ META = {
     "H": ("握拳", "left"),
     "K": ("閉眼大叫", "left"),       # khaki
     "F": ("皺眉托腮", "left"),       # beige
-    "L": ("傻眼", "left"),
     "C": ("托腮沉思", "left"),       # white
     "D": ("抱頭驚訝", "left"),
     "I": ("雙手抱胸", "right"),
