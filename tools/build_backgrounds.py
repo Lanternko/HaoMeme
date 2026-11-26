@@ -36,6 +36,19 @@ def room():
     return ImageOps.fit(im, (W, H), Image.LANCZOS)
 
 
+def classroom():
+    """The classroom with the glowing AI screen behind the 翻車了？ cover, redrawn
+    by Gemini from the cover with the text, the person and the paint taken out."""
+    im = Image.open(ROOT / "src_photos" / "crash_bg.jpg").convert("RGB")
+    return ImageOps.fit(im, (W, H), Image.LANCZOS)
+
+
+def old_classroom():
+    """The dim old classroom with the chalkboard behind the 免談 cover, redrawn the same way."""
+    im = Image.open(ROOT / "src_photos" / "nope_bg.jpg").convert("RGB")
+    return ImageOps.fit(im, (W, H), Image.LANCZOS)
+
+
 def red_paint(name, solid=1.0, tint=None):
     """Red paint on white: turn the white into transparency.
     The paint is red, so the green channel says how much paint covers a pixel;
@@ -74,6 +87,6 @@ BRUSHES = {"crash": ("red_brush",), "nope": ("nope_block", .9),
            "sue": ("sue_red", 1.0, (246, 18, 28)), "sueSmear": ("sue_smear",), "sueSpark": ("sue_spark",)}
 
 dst = ROOT / "backgrounds.js"
-dst.write_text(pack({"smoke": smoke, "room": room}, "BACKGROUNDS") + pack({key: (lambda a=args: red_paint(*a)) for key, args in BRUSHES.items()
+dst.write_text(pack({"smoke": smoke, "room": room, "classroom": classroom, "oldClassroom": old_classroom}, "BACKGROUNDS") + pack({key: (lambda a=args: red_paint(*a)) for key, args in BRUSHES.items()
                                                        if any((ROOT / "src_photos").glob(args[0] + ".*"))}, "BRUSHES"), encoding="utf-8")
 print(dst)

@@ -11,7 +11,7 @@ https://lanternko.github.io/HaoMeme/
 1. **選版型**：在「版型」點「教育我了？」、「翻車了？」、「免談」或「律師傳票」，切換不同的字體風格與預設背景。
 2. **打字**：在「大字」框輸入台詞，按 Enter 換行，每行字會自動放大到剛好排得下。
 3. **上色**：反白選取文字（沒選字就改游標那一行），點「白」、「黃」或「紅」換色，也可勾選「紅色筆刷」；人像很大、把筆刷擋住時，勾「筆刷在人像前」就會把筆刷畫在人像上面（仍在字的下面）。在手機上打字時，鍵盤正上方也會出現一排白黃紅，選好字直接點就好。
-4. **換人像**：點選內建表情、按「隨機換一張」，或按「上傳自己的」換照片（上傳的照片會放在最後一格，換成別張後也能點回來）；背景可以在「背景」點選紅光、灰牆、藍霧燈條、暗色，或按「上傳背景圖」換自己的；上傳的圖會放在第五格，點其他背景後也能點回來。
+4. **換人像**：點選內建表情、按「隨機換一張」，或按「上傳自己的」換照片（上傳的照片會放在最後一格，換成別張後也能點回來）；背景可以在「背景」點選紅光、AI 教室、藍霧燈條、舊教室、灰色房間，或按「上傳背景圖」換自己的；上傳的圖會放在最後一格，點其他背景後也能點回來。
 5. **調位置**：切換人像在「左」或「右」、勾選「翻轉」，或拉動「筆刷大小」、「字體大小」、「旋轉」、「大小」滑桿，或勾選「斜體」讓字往右斜（「翻車了？」預設會勾）；想重來就按「重設位置大小」。
 6. **下載或複製**：按右上角的「下載 PNG」存成圖片檔（iPhone／iPad 上這顆按鈕會變成「存到照片」，按了選「儲存影像」就會存進照片），或按「複製圖片」直接貼給朋友。在手機上按這兩顆按鈕，還會跳出整張圖：存不下來或貼不上時，長按圖片選「下載圖片」或「複製圖片」就好（在 LINE、Discord 這類 App 裡開的網頁常常存不了，可以改用瀏覽器開啟）。
 
@@ -44,7 +44,7 @@ https://lanternko.github.io/HaoMeme/
   python tools/build_portraits.py  # 將 portraits/*.png 與 anchors.json 轉為 base64 WebP 打包進 portraits.js（需 pillow）
   python tools/build_backgrounds.py  # 從 src_photos/ 產生照片背景與紅色筆刷，打包成 backgrounds.js（需 pillow、numpy）
   ```
-  `cutout.py` 的原圖預設讀影片封面，`src_photos/` 放的是另外提供的照片（人像 J、K、L、藍霧燈條背景，以及「翻車了？」和「免談」的紅色筆刷都從這裡來）。「律師傳票」的人像 N、紅色筆刷、黑色塗抹和三條黃線，是照原封面請 Gemini 重畫成高解析度後放進 `src_photos/sue_*` 的（人像是綠幕版，去背後存成 `portraits/N.png`）。
+  `cutout.py` 的原圖預設讀影片封面，`src_photos/` 放的是另外提供的照片（人像 J、K、L、藍霧燈條背景，以及「翻車了？」和「免談」的紅色筆刷都從這裡來）。「律師傳票」的人像 N、紅色筆刷、黑色塗抹和三條黃線，是照原封面請 Gemini 重畫成高解析度後放進 `src_photos/sue_*` 的（人像是綠幕版，去背後存成 `portraits/N.png`）。三個版型的照片背景也是照各自封面請 Gemini 拿掉人和字重畫的：灰色房間是 `sue_bg.jpg`，AI 教室是 `crash_bg.jpg`，舊教室是 `nope_bg.jpg`。
 - **字體來源與授權**：字體檔位於 `fonts/`，皆採用 SIL OFL（`fonts/OFL.txt`）授權：
   - 梗圖大字：**Glow Sans TC / SC Extended Heavy**（`GlowSansTC-Extended-Heavy.otf`，以及補齊繁體版缺字「告值真教清填慎鎮顛巔」10 字的 `GlowSansSC-Extended-Heavy-10.otf`），來源：https://github.com/welai/glow-sans
   - 「律師傳票」大字：同一家族的窄版 **Glow Sans TC / SC Condensed Heavy**（`GlowSansTC-Condensed-Heavy.otf`、補缺字的 `GlowSansSC-Condensed-Heavy-10.otf`），只在選到這個版型時才下載
