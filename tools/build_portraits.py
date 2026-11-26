@@ -15,12 +15,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 
 # key -> (label, side the portrait sits on by default), in the order the page
-# shows them: by shirt colour, dark to light. The page keeps a twelfth slot for
-# an uploaded portrait, so eleven are packed (portraits/M.png is left out).
+# shows them: by shirt colour, dark to light. The page keeps one more slot for
+# an uploaded portrait, so twelve are packed (portraits/M.png is left out).
 META = {
     "A": ("舉手說教", "left"),       # black
     "E": ("指著你", "right"),
     "J": ("連帽口罩", "right"),
+    "N": ("麥克風", "right"),       # src_photos/sue_person_green.jpg, redrawn sharp by Gemini, green keyed out
     "G": ("托腮斜眼", "left"),       # navy
     "H": ("握拳", "left"),
     "K": ("閉眼大叫", "left"),       # khaki

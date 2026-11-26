@@ -57,7 +57,10 @@ def pack(table, var):
 
 # brush key -> its picture in src_photos/ (any image type); a missing one is left out
 # and the page falls back to drawing that brush itself
-BRUSHES = {"crash": ("red_brush",), "nope": ("nope_block", .9)}
+# (the "sue" pictures were drawn by Gemini after the 律師傳票 cover: the red swoosh
+# under the last line, the black smear behind the first, the three yellow dashes)
+BRUSHES = {"crash": ("red_brush",), "nope": ("nope_block", .9),
+           "sue": ("sue_red",), "sueSmear": ("sue_smear",), "sueSpark": ("sue_spark",)}
 
 dst = ROOT / "backgrounds.js"
 dst.write_text(pack({"smoke": smoke}, "BACKGROUNDS") + pack({key: (lambda a=args: red_paint(*a)) for key, args in BRUSHES.items()
