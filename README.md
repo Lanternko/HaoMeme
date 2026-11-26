@@ -49,3 +49,4 @@ https://lanternko.github.io/HaoMeme/
   - 梗圖大字：**Glow Sans TC / SC Extended Heavy**（`GlowSansTC-Extended-Heavy.otf`，以及補齊繁體版缺字「告值真教清填慎鎮顛巔」10 字的 `GlowSansSC-Extended-Heavy-10.otf`），來源：https://github.com/welai/glow-sans
   - 「律師傳票」大字：同一家族的窄版 **Glow Sans TC / SC Condensed Heavy**（`GlowSansTC-Condensed-Heavy.otf`、補缺字的 `GlowSansSC-Condensed-Heavy-10.otf`），只在選到這個版型時才下載
   - 標題標準字：**Outfit**（`outfit-500.ttf`、`outfit-700.ttf`）
+  - 網頁實際載入的是 `fonts/woff2/` 裡切好的小塊（每塊約 750 字，打到哪些字才下載哪幾塊），以及對應的 `fonts/fonts.css`。改過上面的原始字體後，用 `pip install fonttools brotli` 再執行 `python tools/split_fonts.py` 重新切。

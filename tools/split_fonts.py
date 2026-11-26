@@ -1,0 +1,169 @@
+"""Split large Glow Sans OTF fonts into WOFF2 unicode-range chunks and
+convert Outfit TTFs to WOFF2, generating fonts/fonts.css.
+
+Initial page load only fetches the first chunk, about 230 KB (ASCII,
+punctuation and the template texts), instead of 9 MB per font family. Additional chunks load on demand when
+the user types characters in those unicode ranges.
+
+Usage:
+    python tools/split_fonts.py      # needs fonttools + brotli
+"""
+from pathlib import Path
+from fontTools.ttLib import TTFont
+from fontTools.subset import Subsetter, Options
+
+ROOT = Path(__file__).resolve().parent.parent
+FONTS = ROOT / "fonts"
+OUT = FONTS / "woff2"
+OUT.mkdir(exist_ok=True)
+
+# Characters that appear on initial render or in common UI/presets:
+# put them all in chunk 0 so first paint needs only one tiny ~20 KB request.
+PRESET_CHARS = (
+    "輪到你教育我了？AI翻車想玩GTA6免談準備收律師傳票"
+    "的是一不了人在有我他這為之大來以個中上們到說國和地也子時道出而要於就下得可你年生"
+    "自會那後能對著事其裡所去行過家十用發天如然作方成者多日都三小軍二無同麼經法當起"
+    "與好看學進種將還分此心前面又定見只主沒公從"
+    "？！。，、：；「」『』（）—…～·"
+)
+PRIORITY_CPS = (
+    set(range(0x0020, 0x007F))
+    | set(range(0x3000, 0x3020))
+    | set(range(0xFF01, 0xFF5F))
+    | {ord(c) for c in PRESET_CHARS}
+)
+
+# 10 chars missing from GlowSansTC that come from GlowSansSC-*-10.otf
+SC_PATCH_CPS = [0x544A, 0x503C, 0x771F, 0x6559, 0x6E05, 0x586B, 0x614E, 0x93AE, 0x985B, 0x5DD4]
+
+
+def format_unicode_range(cps):
+    """Compress sorted codepoints into compact CSS unicode-range string."""
+    if not cps:
+        return ""
+    cps = sorted(set(cps))
+    ranges = []
+    start = prev = cps[0]
+    for cp in cps[1:]:
+        if cp == prev + 1:
+            prev = cp
+        else:
+            ranges.append(f"U+{start:X}" if start == prev else f"U+{start:X}-{prev:X}")
+            start = prev = cp
+    ranges.append(f"U+{start:X}" if start == prev else f"U+{start:X}-{prev:X}")
+    return ", ".join(ranges)
+
+
+def make_woff2_subset(src_path: Path, dst_path: Path, unicodes):
+    font = TTFont(src_path)
+    opts = Options()
+    opts.flavor = "woff2"
+    opts.layout_features = ["kern"]
+    opts.hinting = False
+    opts.glyph_names = False
+    opts.name_IDs = [1, 2, 4, 6]
+    opts.desubroutinize = False
+    subsetter = Subsetter(options=opts)
+    subsetter.populate(unicodes=unicodes)
+    subsetter.subset(font)
+    font.save(dst_path)
+    font.close()
+
+
+def split_cjk_family(family_name: str, prefix: str, tc_otf: Path, sc_patch_otf: Path, chunk_size: int = 750):
+    font = TTFont(tc_otf)
+    cmap = font.getBestCmap()
+    all_cps = sorted(cmap.keys())
+    font.close()
+
+    # Chunk 0: priority chars present in the font
+    chunk0 = sorted(cp for cp in all_cps if cp in PRIORITY_CPS)
+    rest = [cp for cp in all_cps if cp not in PRIORITY_CPS]
+
+    chunks = [chunk0]
+    for i in range(0, len(rest), chunk_size):
+        chunks.append(rest[i : i + chunk_size])
+
+    css_rules = []
+    total_kb = 0.0
+    for idx, cps in enumerate(chunks):
+        fname = f"{prefix}-{idx:02d}.woff2"
+        dst = OUT / fname
+        make_woff2_subset(tc_otf, dst, cps)
+        kb = dst.stat().st_size / 1024
+        total_kb += kb
+        urange = format_unicode_range(cps)
+        css_rules.append(
+            f'@font-face {{\n'
+            f'  font-family: "{family_name}";\n'
+            f'  src: url("woff2/{fname}") format("woff2");\n'
+            f'  font-weight: 900;\n'
+            f'  font-display: swap;\n'
+            f'  unicode-range: {urange};\n'
+            f'}}'
+        )
+    print(f"{family_name}: {len(chunks)} chunks, chunk0={ (OUT / f'{prefix}-00.woff2').stat().st_size / 1024:.1f} KB, total={total_kb:.1f} KB")
+
+    # 10-character SC patch font as WOFF2
+    patch_name = f"{prefix}-sc10.woff2"
+    patch_dst = OUT / patch_name
+    make_woff2_subset(sc_patch_otf, patch_dst, SC_PATCH_CPS)
+    print(f"  + {patch_name}: {patch_dst.stat().st_size / 1024:.1f} KB")
+    css_rules.append(
+        f'@font-face {{\n'
+        f'  font-family: "{family_name}";\n'
+        f'  src: url("woff2/{patch_name}") format("woff2");\n'
+        f'  font-weight: 900;\n'
+        f'  font-display: swap;\n'
+        f'  unicode-range: {format_unicode_range(SC_PATCH_CPS)};\n'
+        f'}}'
+    )
+    return css_rules
+
+
+def convert_outfit():
+    rules = []
+    for weight in (500, 700):
+        src = FONTS / f"outfit-{weight}.ttf"
+        dst = OUT / f"outfit-{weight}.woff2"
+        font = TTFont(src)
+        font.flavor = "woff2"
+        font.save(dst)
+        font.close()
+        print(f"Outfit {weight}: {dst.stat().st_size / 1024:.1f} KB (was {src.stat().st_size / 1024:.1f} KB)")
+        rules.append(
+            f'@font-face {{\n'
+            f'  font-family: "Outfit";\n'
+            f'  src: url("woff2/outfit-{weight}.woff2") format("woff2");\n'
+            f'  font-weight: {weight};\n'
+            f'  font-display: swap;\n'
+            f'}}'
+        )
+    return rules
+
+
+def main():
+    # Clean old woff2 files
+    for old in OUT.glob("*.woff2"):
+        old.unlink()
+
+    rules = ["/* Auto-generated by tools/split_fonts.py — Glow Sans (SIL OFL) & Outfit (SIL OFL) */"]
+    rules.extend(split_cjk_family(
+        "Hao Title", "hao-title",
+        FONTS / "GlowSansTC-Extended-Heavy.otf",
+        FONTS / "GlowSansSC-Extended-Heavy-10.otf",
+    ))
+    rules.extend(split_cjk_family(
+        "Hao Sue", "hao-sue",
+        FONTS / "GlowSansTC-Condensed-Heavy.otf",
+        FONTS / "GlowSansSC-Condensed-Heavy-10.otf",
+    ))
+    rules.extend(convert_outfit())
+
+    css_path = FONTS / "fonts.css"
+    css_path.write_text("\n".join(rules) + "\n", encoding="utf-8")
+    print(f"Wrote {css_path} ({css_path.stat().st_size / 1024:.1f} KB)")
+
+
+if __name__ == "__main__":
+    main()

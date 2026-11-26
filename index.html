@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>豪老師梗圖產生器</title>
 <!-- link preview (Discord, LINE, Facebook, X): title, one line, and a sample meme -->
 <meta name="description" content="高品質大字圖">
@@ -20,21 +20,9 @@
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" href="favicon-64.png" sizes="64x64">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" as="font" type="font/woff2" href="fonts/woff2/hao-title-00.woff2" crossorigin>
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
-/* Glow Sans TC Extended Heavy (SIL OFL), https://github.com/welai/glow-sans */
-@font-face { font-family: "Hao Title"; src: url("fonts/GlowSansTC-Extended-Heavy.otf") format("opentype"); font-weight: 900; font-display: block; }
-/* The TC cut has no glyph for 告值真教清填慎鎮顛巔; these ten come from the SC cut
-   of the same family (same weight and width), subset to just those characters. */
-@font-face { font-family: "Hao Title"; src: url("fonts/GlowSansSC-Extended-Heavy-10.otf") format("opentype"); font-weight: 900; font-display: block;
-             unicode-range: U+544A, U+503C, U+771F, U+6559, U+6E05, U+586B, U+614E, U+93AE, U+985B, U+5DD4; }
-/* 律師傳票 letters: the Condensed cut of the same family (taller, narrower), as on that cover.
-   Only fetched once that template is picked. */
-@font-face { font-family: "Hao Sue"; src: url("fonts/GlowSansTC-Condensed-Heavy.otf") format("opentype"); font-weight: 900; font-display: block; }
-@font-face { font-family: "Hao Sue"; src: url("fonts/GlowSansSC-Condensed-Heavy-10.otf") format("opentype"); font-weight: 900; font-display: block;
-             unicode-range: U+544A, U+503C, U+771F, U+6559, U+6E05, U+586B, U+614E, U+93AE, U+985B, U+5DD4; }
-/* Outfit (SIL OFL): only for the wordmark */
-@font-face { font-family: "Outfit"; src: url("fonts/outfit-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Outfit"; src: url("fonts/outfit-700.ttf") format("truetype"); font-weight: 700; font-display: swap; }
   /* Page look follows the arammeta design system: dark charcoal canvas, flat
      surfaces split by hairlines, one soft blue accent, 8/12px corners. */
   :root {
@@ -77,53 +65,59 @@
   canvas { width: 100%; height: auto; display: block; }
   #cv { touch-action: none; }
   #ov { position: absolute; inset: 0; height: 100%; background: none; pointer-events: none; }
-  .note { margin: 12px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
-  .note + .note { margin-top: 4px; color: var(--text-dim); }
+  .stage-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+  .stage-bar .note { margin: 0; }
+  .stage-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .stage-btns button { padding: 6px 10px; font-size: 12px; }
+  .note { margin: 6px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+  .note.dim { color: var(--text-dim); }
 
-  /* one flat panel; its groups are split by hairlines, not boxed again */
-  .panel { display: flex; flex-direction: column; gap: 16px; }
-  /* each group is its own card with a titled header strip, so it is plain
-     which controls belong to which part of the picture */
-  fieldset { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); margin: 0; padding: 16px; min-width: 0; overflow: hidden; }
-  legend { float: left; display: flex; align-items: center; gap: 8px; width: calc(100% + 32px); margin: -16px -16px 16px; padding: 11px 16px;
-           background: var(--offwhite); color: #111; font-size: 15px; font-weight: 700; line-height: 1.25; }
-  legend + * { clear: both; }
-  label { display: block; margin-top: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+  /* right control column: template grid + tabbed card */
+  .panel { display: flex; flex-direction: column; gap: 14px; }
+  .tpl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .tpl-grid button { padding: 12px 10px; font-size: 15px; font-weight: 700; letter-spacing: .02em; background: var(--surface);
+                     border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text-muted); }
+  .tpl-grid button:hover { color: var(--text); background: var(--surface-raised); }
+  .tpl-grid button.on, .tpl-grid button.on:hover { background: var(--offwhite); border-color: var(--offwhite); color: #111; }
+
+  .card { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--border); background: var(--surface-raised); }
+  .tabs button { border: 0; border-radius: 0; background: none; padding: 12px 8px; font-size: 14px; font-weight: 700; color: var(--text-muted);
+                 border-bottom: 2px solid transparent; }
+  .tabs button:hover { background: rgba(255,255,255,.04); color: var(--text); }
+  .tabs button.on, .tabs button.on:hover { background: var(--surface); color: var(--text); border-bottom-color: var(--accent); }
+  .tab-body { padding: 18px 16px; }
+  .tab-body[hidden] { display: none; }
+
+  details.more { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  details.more summary { cursor: pointer; color: var(--text-muted); font-size: 12px; font-weight: 600; user-select: none; list-style: none;
+                         display: flex; align-items: center; justify-content: space-between; }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more summary::after { content: "▾"; font-size: 13px; transition: transform 150ms var(--ease); }
+  details.more[open] summary::after { transform: rotate(180deg); }
+  details.more[open] summary { color: var(--text); margin-bottom: 6px; }
+
+  label { display: block; margin-top: 14px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
   label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 400; font-size: 14px; }
-  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
   .row > button { flex: 1; }
-  .row.checks { gap: 8px 24px; flex-wrap: wrap; }
+  .row.checks { gap: 8px 20px; flex-wrap: wrap; }
   .row.checks label.check { margin: 0; }
-  small { display: block; margin-top: 8px; color: var(--text-dim); font-size: 12px; line-height: 1.6; }
+  small { display: block; margin-top: 8px; color: var(--text-dim); font-size: 12px; line-height: 1.5; }
 
   button { background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 12px;
            font: 600 12px/1.25 var(--font-ui); cursor: pointer; transition: background 120ms var(--ease), border-color 120ms var(--ease), color 120ms var(--ease); }
-  button:hover { border-color: var(--border-strong); background: #20242a; }
+  button:hover:not(:disabled) { border-color: var(--border-strong); background: #20242a; }
+  button:disabled { opacity: .4; cursor: default; }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); padding: 10px 14px; }
-  button.primary:hover { background: var(--accent-soft); border-color: var(--accent-soft); }
+  button.primary:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent-soft); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* segmented control: one pill, the chosen part filled with the accent */
-  .seg { display: flex; background: var(--surface-raised); border-radius: 4px; overflow: hidden; }
-  .seg button { flex: 1; border: 0; background: none; border-radius: 0; color: var(--text-muted); padding: 10px 12px; font-size: 13px; font-weight: 700; }
+  /* segmented control for left/right */
+  .seg { display: flex; background: var(--surface-raised); border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--border); }
+  .seg button { flex: 1; border: 0; background: none; border-radius: 0; color: var(--text-muted); padding: 8px 12px; font-size: 13px; font-weight: 700; }
   .seg button:hover { background: none; color: var(--text); }
-  /* the chosen half is off-white and ends in a slanted cut; the halves
-     overlap by the width of the cut so it sits on the middle line */
-  .seg button:first-child { margin-right: -8px; }
-  .seg button:last-child { margin-left: -8px; }
   .seg button.on, .seg button.on:hover { background: var(--offwhite); color: #111; }
-  .seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%); }
-  .seg button.on:last-child { clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%); }
-  /* the template switch stands on its own above the cards, bigger */
-  .tpl-seg { border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); }
-  .tpl-seg button { padding: 18px 16px; font-size: 18px; letter-spacing: .02em; }
-  .tpl-seg button:first-child { margin-right: -12px; }
-  .tpl-seg button:last-child { margin-left: -12px; }
-  .tpl-seg button.on:first-child { clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
-  .tpl-seg button.on:last-child { clip-path: polygon(24px 0, 100% 0, 100% 100%, 0 100%); }
-  /* a middle one overlaps both neighbours and is slanted on both sides */
-  .tpl-seg button:not(:first-child):not(:last-child) { margin: 0 -12px; }
-  .tpl-seg button.on:not(:first-child):not(:last-child) { clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
   button svg { width: 15px; height: 15px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   input[type=range] { display: block; width: 100%; margin: 8px 0 0; accent-color: var(--accent); }
@@ -146,23 +140,27 @@
   #kbColors { position: fixed; left: 0; right: 0; top: 0; z-index: 60; margin: 0; gap: 8px;
     padding: 8px 16px; background: var(--surface-raised); border-top: 1px solid var(--border-strong); }
   #kbColors[hidden] { display: none; }
-  #kbColors button { min-width: 64px; min-height: 40px; font-size: 17px; }
+  #kbColors button { min-width: 56px; min-height: 40px; font-size: 16px; }
+  #kbDone { margin-left: auto; background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-size: 14px; min-width: 60px; }
 
-  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .thumbs button { padding: 0; height: 72px; overflow: hidden; background: var(--surface-raised); border-color: var(--border); }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .thumbs button { padding: 0; height: auto; aspect-ratio: 1 / 1; overflow: hidden; background: var(--surface-raised); border-color: var(--border); position: relative; }
   @media (hover: hover) { .thumbs button:hover { filter: brightness(1.15); } }
   /* The ring is drawn inside the tile, over the picture. Drawn outside (outline or
      shadow), iPhone Safari cut it off once a tapped tile was brightened. */
-  .thumbs button { position: relative; }
   .thumbs button.on::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--accent);
     border-radius: inherit; pointer-events: none; }
-  .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; }
   .bgs { grid-template-columns: repeat(3, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
   .bgs canvas { height: 100%; }
-  /* the last tile holds the uploaded picture; dashed while empty */
-  .thumbs button.up { background: transparent; border: 1px dashed var(--text-dim); }
-  .thumbs button.up.has { border-style: solid; }
+  /* the last tile holds the uploaded picture; dashed with a clear + icon while empty */
+  .thumbs button.up { background: transparent; border: 1px dashed var(--text-dim); color: var(--text-muted);
+                      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; }
+  .thumbs button.up:not(.has)::before { content: "+"; font-size: 20px; line-height: 1; font-weight: 400; color: var(--text-muted); }
+  .thumbs button.up:not(.has)::after { content: "上傳"; font-size: 10px; color: var(--text-dim); position: static; border: 0; }
+  .bgs button.up:not(.has)::after { display: none; }
+  .thumbs button.up.has { border-style: solid; display: block; }
   .bgs button.up img { object-position: center; }
   #side { flex: 1; }
 
@@ -176,17 +174,53 @@
   footer a:hover, footer a:focus-visible { background: rgba(106, 168, 247, .2); border-color: rgba(106, 168, 247, .6); }
   footer a:active { transform: translateY(1px); box-shadow: none; }
 
-  @media (max-width: 980px) { main { grid-template-columns: 1fr; } .preview { position: static; } }
-  /* phone: the preview stays pinned at the top while the controls scroll under it */
+  .note.mobile-tip { display: none; }
+  @media (max-width: 980px) {
+    main { grid-template-columns: minmax(0, 1fr); }   /* the template row scrolls instead of widening the page */
+    .preview { position: static; }
+    .thumbs:not(.bgs) { grid-template-columns: repeat(6, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .thumbs:not(.bgs) { grid-template-columns: repeat(4, 1fr); }
+  }
+  /* touch devices: larger slider thumbs and checkboxes for easy thumb control */
+  @media (pointer: coarse) {
+    input[type=range] { height: 32px; margin-top: 4px; }
+    input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; }
+    input[type=checkbox] { width: 20px; height: 20px; }
+    label.check { min-height: 36px; }
+  }
+  /* phone: preview pinned at top, templates in 1 compact row, export docked to thumb bar at bottom */
   @media (max-width: 700px) {
     .rail { padding: 0 12px; }
-    header { position: static; }
-    .brand-title { font-size: 22px; }
+    header { position: static; height: 42px; }
+    .brand-title { font-size: 20px; }
     .brand-sub { display: none; }
-    main { gap: 12px; padding-top: 0; }
-    .preview { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 8px 0; }
+    header .actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 8px;
+                      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+                      background: rgba(16, 17, 20, .94); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+                      border-top: 1px solid var(--border-strong); }
+    header .actions button { flex: 1; min-height: 44px; font-size: 15px; }
+    #msg { position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+           background: rgba(26, 29, 33, .95); border: 1px solid var(--border-strong); color: var(--text);
+           padding: 6px 14px; border-radius: 999px; font-size: 13px; pointer-events: none; white-space: nowrap; }
+    #msg:empty { display: none; }
+    main { gap: 10px; padding-top: 0; padding-bottom: 16px; }
+    .preview { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 6px 0 4px; }
     .preview .note { display: none; }
-    .tpl-seg button { padding: 14px 8px; font-size: 15px; }
+    .preview .note.mobile-tip { display: block; font-size: 11px; color: var(--text-dim); }
+    .stage-bar { margin-top: 6px; }
+    .stage-btns button { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+    .tpl-grid { display: flex; overflow-x: auto; gap: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .tpl-grid::-webkit-scrollbar { display: none; }
+    .tpl-grid button { flex: 1 0 auto; white-space: nowrap; min-height: 40px; padding: 8px 12px; font-size: 14px; }
+    .tabs button { min-height: 44px; font-size: 15px; }
+    .tab-body { padding: 14px 12px; }
+    .row > button, .seg button { min-height: 42px; font-size: 14px; }
+    .row > button { white-space: nowrap; padding-left: 8px; padding-right: 8px; }   /* 「上傳背景」 stays on one line */
+    .colors button { min-width: 50px; min-height: 40px; font-size: 15px; }
+    details.more summary { min-height: 36px; font-size: 13px; }
+    footer p { padding: 16px 0 calc(84px + env(safe-area-inset-bottom)); }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   /* phones: the finished picture, to long-press and save or copy */
@@ -220,83 +254,97 @@
       <canvas id="cv" width="1280" height="720"></canvas>
       <canvas id="ov" width="1280" height="720"></canvas>
     </div>
-    <p class="note">點選文字、人像或背景，拖曳移動；拉角落圓點、滾輪或兩指縮放，拉文字上方圓點旋轉；方向鍵微調，Esc 取消，雙擊文字改字。</p>
-    <p class="note">輸出 1280×720。人像來自「拆書人」頻道原始封面，只能私下玩梗，不要拿去冒充本人發文。</p>
+    <div class="stage-bar">
+      <p class="note">點選文字、筆刷、人像或背景可拖曳縮放，雙擊文字改字。</p>
+      <p class="note mobile-tip">點選元素可拖曳・雙指縮放</p>
+      <div class="stage-btns">
+        <button id="undo" disabled title="復原 (Ctrl+Z)">復原</button>
+        <button id="resetPos" title="重設所有位置與大小">重設位置</button>
+      </div>
+    </div>
+    <p class="note dim">1280×720 輸出・人像源自「拆書人」封面，僅供私下玩梗。</p>
   </div>
 
   <section class="panel">
-    <div class="seg tpl-seg" id="tpl" role="group" aria-label="版型">
+    <div class="tpl-grid" id="tpl" role="group" aria-label="版型">
       <button data-v="teach">教育我了？</button>
       <button data-v="crash">翻車了？</button>
       <button data-v="nope">免談</button>
       <button data-v="sue">律師傳票</button>
     </div>
 
-    <fieldset>
-      <legend>大字</legend>
-      <div class="ed-wrap">
-        <div id="edMirror" aria-hidden="true"></div>
-        <textarea id="ed" spellcheck="false" aria-label="大字內容"></textarea>
+    <div class="card">
+      <div class="tabs" id="tabs" role="tablist">
+        <button role="tab" aria-selected="true" class="on" data-tab="text">大字</button>
+        <button role="tab" aria-selected="false" data-tab="portrait">人像</button>
+        <button role="tab" aria-selected="false" data-tab="bg">背景</button>
       </div>
-      <div class="row colors">
-        <span>選字上色</span>
-        <button data-c="white" class="k-white">白</button>
-        <button data-c="yellow" class="k-yellow">黃</button>
-        <button data-c="red" class="k-red">紅</button>
-      </div>
-      <small>換行會自動排版，選取文字可以換色</small>
-      <div id="kbColors" class="row colors" hidden>
-        <span>選字上色</span>
-        <button data-c="white" class="k-white">白</button>
-        <button data-c="yellow" class="k-yellow">黃</button>
-        <button data-c="red" class="k-red">紅</button>
-      </div>
-      <div class="row checks">
-        <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
-        <label class="check"><input type="checkbox" id="italic"> 斜體</label>
-        <label class="check"><input type="checkbox" id="brushFront"> 筆刷在人像前</label>
-      </div>
-      <label>筆刷大小 <input type="range" id="brsize" min="30" max="250" value="100"></label>
-      <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
-      <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
-    </fieldset>
 
-    <fieldset>
-      <legend>人像</legend>
-      <div class="thumbs" id="thumbs"></div>
-      <div class="row">
-        <button id="rand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>隨機換一張</button>
-        <button id="upBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳自己的</button>
-        <input type="file" id="up" accept="image/*" hidden>
-      </div>
-      <div class="row">
-        <span>位置</span>
-        <div class="seg" id="side">
-          <button data-v="left">左</button>
-          <button data-v="right">右</button>
+      <div class="tab-body" data-panel="text" role="tabpanel">
+        <div class="ed-wrap">
+          <div id="edMirror" aria-hidden="true"></div>
+          <textarea id="ed" spellcheck="false" aria-label="大字內容"></textarea>
         </div>
-        <label class="check" style="margin:0"><input type="checkbox" id="flip"> 翻轉</label>
+        <div class="row colors">
+          <span>選字上色</span>
+          <button data-c="white" class="k-white">白</button>
+          <button data-c="yellow" class="k-yellow">黃</button>
+          <button data-c="red" class="k-red">紅</button>
+        </div>
+        <small>換行會自動排版，選取文字可以換色</small>
+        <div id="kbColors" class="row colors" hidden>
+          <span>上色</span>
+          <button data-c="white" class="k-white">白</button>
+          <button data-c="yellow" class="k-yellow">黃</button>
+          <button data-c="red" class="k-red">紅</button>
+          <button id="kbDone" type="button">完成</button>
+        </div>
+        <div class="row checks">
+          <label class="check"><input type="checkbox" id="brush" checked> 紅色筆刷</label>
+          <label class="check"><input type="checkbox" id="italic"> 斜體</label>
+        </div>
+        <details class="more">
+          <summary>進階微調</summary>
+          <div class="row checks">
+            <label class="check"><input type="checkbox" id="brushFront"> 筆刷在人像前</label>
+          </div>
+          <label>文字大小 <input type="range" id="tsize" min="30" max="220" value="100"></label>
+          <label>文字旋轉 <span id="trotv">0°</span> <input type="range" id="trot" min="-180" max="180" value="0"></label>
+          <label>筆刷大小 <input type="range" id="brsize" min="30" max="250" value="100"></label>
+        </details>
       </div>
-      <label>人像大小 <input type="range" id="psize" min="30" max="260" value="100"></label>
-      <div class="row"><button id="resetPos">重設位置大小</button></div>
-    </fieldset>
 
-    <fieldset>
-      <legend>背景</legend>
-      <div class="thumbs bgs" id="bgs"></div>
-      <div class="row">
-        <button id="bgBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳背景圖</button>
-        <input type="file" id="bg" accept="image/*" hidden>
+      <div class="tab-body" data-panel="portrait" role="tabpanel" hidden>
+        <div class="thumbs" id="thumbs"></div>
+        <div class="row">
+          <button id="rand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>隨機換一張</button>
+          <button id="upBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳照片</button>
+          <input type="file" id="up" accept="image/*" hidden>
+        </div>
+        <div class="row">
+          <span>位置</span>
+          <div class="seg" id="side">
+            <button data-v="left">左</button>
+            <button data-v="right">右</button>
+          </div>
+          <label class="check" style="margin:0"><input type="checkbox" id="flip"> 翻轉</label>
+        </div>
+        <label>人像大小 <input type="range" id="psize" min="30" max="260" value="100"></label>
       </div>
-      <label>背景大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
-      <label>背景虛化 <input type="range" id="bblur" min="0" max="30" value="0"></label>
-      <div class="row">
-        <button id="bgFill">填滿畫面</button>
-        <button id="bgFit">完整顯示</button>
+
+      <div class="tab-body" data-panel="bg" role="tabpanel" hidden>
+        <div class="thumbs bgs" id="bgs"></div>
+        <div class="row">
+          <button id="bgBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上傳背景</button>
+          <button id="bgFill">填滿</button>
+          <button id="bgFit">完整顯示</button>
+          <input type="file" id="bg" accept="image/*" hidden>
+        </div>
+        <label>背景虛化 <input type="range" id="bblur" min="0" max="30" value="0"></label>
+        <label>背景大小 <input type="range" id="bsize" min="10" max="300" value="100"></label>
+        <label class="check"><input type="checkbox" id="bgBlurFill" checked> 自動補滿邊緣</label>
       </div>
-      <label class="check"><input type="checkbox" id="bgBlurFill" checked> 背景沒蓋滿時，從圖片邊緣往外延伸補滿</label>
-      <small>點文字和人像以外的地方就能選背景，拖曳移動、拉角落縮放。直的圖預設完整顯示。</small>
-    </fieldset>
+    </div>
   </section>
 </main>
 
@@ -372,6 +420,7 @@ function setBgFit(fit) {
 // built-in backgrounds; each template starts on its own one
 const BACKDROPS = [["red", "紅光"], ["grey", "灰牆"], ["smoke", "藍霧燈條"], ["dark", "暗色"], ["room", "灰色房間"]];
 const TPL_BG = { teach: "red", crash: "grey", nope: "dark", sue: "room" };
+const TPL_PORTRAIT = { teach: "A", crash: "C", nope: "F", sue: "N" };
 const bgPhotos = {};                                   // photo backgrounds from backgrounds.js, by key
 const brushImgs = {};                                  // painted strokes from backgrounds.js, by template
 
@@ -394,9 +443,11 @@ function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
     g.fillStyle = b; g.fillRect(0, 0, W, H);
   } else if (kind === "grey") {
     const b = g.createLinearGradient(0, 0, W, H);
-    b.addColorStop(0, "#5c6b78"); b.addColorStop(.5, "#27323d"); b.addColorStop(1, "#0d1218");
+    b.addColorStop(0, "#5e6f7f"); b.addColorStop(.48, "#25313e"); b.addColorStop(1, "#0a0f15");
     g.fillStyle = b; g.fillRect(0, 0, W, H);
-    // soft light blobs, like an out-of-focus room
+    // subtle cool studio/screen glow on the right + soft out-of-focus room bokeh
+    glow(g, 1060, 180, 420, 260, "74,148,230", .26);
+    glow(g, 220, 140, 340, 240, "190,210,230", .16);
     const r = rng(7);
     for (let i = 0; i < 16; i++) {
       const x = r() * W, y = r() * H, rad = 60 + r() * 160;
@@ -406,14 +457,14 @@ function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
       g.fillStyle = c; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     }
   } else if (kind === "dark") {
-    // a dim room far out of focus: window light top left, a bright doorway
+    // a dim room far out of focus: warm window light top left, bright doorway
     // top right, and darkest in the middle where the headline goes
-    g.fillStyle = "#15120f"; g.fillRect(0, 0, W, H);
-    glow(g, 120, 90, 330, 230, "176,166,150", .5);
-    glow(g, 1130, 120, 170, 300, "214,208,196", .45);
-    glow(g, 1110, 640, 360, 170, "112,94,76", .45);
+    g.fillStyle = "#120f0c"; g.fillRect(0, 0, W, H);
+    glow(g, 110, 80, 360, 250, "205,184,152", .56);
+    glow(g, 1140, 115, 165, 310, "236,228,214", .58);
+    glow(g, 1110, 640, 360, 170, "118,96,74", .48);
     glow(g, 60, 620, 260, 200, "86,74,62", .5);
-    glow(g, 760, 360, 560, 330, "0,0,0", .85);
+    glow(g, 760, 360, 560, 340, "0,0,0", .9);
   } else {
     const im = bgPhotos[kind];
     g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
@@ -425,7 +476,23 @@ function drawBackdrop(personCx) {
   paintBackdrop(ctx, state.backdrop, personCx);
 }
 
+// Cache the finished background layer so dragging text or portraits doesn't
+// recompute heavy blur / edge-extension passes every frame.
+const bgCacheCv = Object.assign(document.createElement("canvas"), { width: W, height: H });
+const bgCacheCtx = bgCacheCv.getContext("2d");
+let bgCacheKey = "";
+function invalidateBgCache() { bgCacheKey = ""; }
+drawBackground.ids = 0;
+
 function drawBackground(personCx) {
+  const blur = +$("bblur").value;
+  const fillEdges = $("bgBlurFill").checked;
+  // each uploaded picture gets its own number (two photos of the same size must not share the cache)
+  const bgId = state.bg ? "up:" + (state.bg.cacheId ||= ++drawBackground.ids) : "bd:" + state.backdrop;
+  const cxKey = !state.bg && state.backdrop === "red" ? Math.round(personCx) : 0;
+  const key = [bgId, state.tpl === "crash" && !!state.bg, Math.round(state.bgx), Math.round(state.bgy),
+               $("bsize").value, blur, fillEdges, cxKey, bgPhotos[state.backdrop]?.naturalWidth || 0].join("|");
+  if (key === bgCacheKey) { ctx.drawImage(bgCacheCv, 0, 0); return; }
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);  // shows wherever the background was moved away
   const b = bgBox();
   drawBgBox(b, personCx);
@@ -474,9 +541,11 @@ function drawBackground(personCx) {
     ctx.drawImage(fog, 0, 0);
     ctx.drawImage(buf, vx0, vy0, vw, vh, vx0, vy0, vw, vh);     // the sharp background back on top
   }
-  const blur = +$("bblur").value;
   if (blur > 0) blurFrame(blur);
   drawFrameShade();
+  bgCacheCtx.clearRect(0, 0, W, H);
+  bgCacheCtx.drawImage(cv, 0, 0);
+  bgCacheKey = key;
 }
 
 // blur everything drawn so far (the background), out of focus like a camera.
@@ -614,7 +683,10 @@ function headSpot(b) {
 function drawPortrait(b, ctx = cv.getContext("2d"), bare = false) {   // bare: no drop shadow
   if (!b) return;
   ctx.save();
-  if (!bare) { ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 12; }
+  if (!bare) {
+    ctx.shadowColor = state.backdrop === "red" && !state.bg ? "rgba(40,0,0,.58)" : "rgba(0,0,0,.52)";
+    ctx.shadowBlur = 16;
+  }
   if ($("flip").checked) {
     ctx.translate(b.x + b.w, b.y); ctx.scale(-1, 1);
     ctx.drawImage(b.img, 0, 0, b.w, b.h);
@@ -1061,7 +1133,7 @@ const CLOUD_SIZE = 256;
 // (x, y: centre from the line's middle and top; w, h: size)
 const SUE_SWOOSH = { x: 0, y: 1.17, w: 1.35, h: 1.35, rot: 2 };
 const SUE_SMEAR = { x: -.04, y: .42, w: 1.6, h: 1.6 };
-const SUE_SPARK = { x: -.02, y: .5, w: .48 };
+const SUE_SPARK = { x: -.01, y: .64, w: .42 };
 // the yellow dashes sit beside the head, on the side facing the text, and point at it
 // (in shares of the head's width: gap from its outline, drop below the spot, picture width)
 const SUE_HEAD = { gap: .04, dy: .06, w: .32 };
@@ -1166,7 +1238,7 @@ function drawText(area, pass, person) {
       // painted stroke (backgrounds.js): its body runs through (565, 231) of the
       // 1100-wide image, about 830 px long and 240 px thick, climbing ~13.6° to the right.
       // It is sized to the last line: about as long as the line and as thick as the letters.
-      const k = last.width / 830, u = paint.naturalWidth / 1100;
+      const k = (last.width / 830) * 1.12, u = paint.naturalWidth / 1100;
       ctx.translate((last.width - maxW) / 2 + last.width * .02, lastTop + last.h * .56);
       userBrush(0, 0);
       rememberBrush(-415 * k, -120 * k, 415 * k, 120 * k);   // outline, along the text
@@ -1335,8 +1407,10 @@ function corners(what) {
   const b = what === "bg" ? bgBox() : portraitBox();
   return b && [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
 }
-// handles are pulled inside the picture so a corner that hangs off the edge can still be grabbed
-const handle = ([x, y]) => [Math.min(W - 12, Math.max(12, x)), Math.min(H - 12, Math.max(12, y))];
+// handles are pulled inside the picture so a corner or rotation knob that hangs off the edge can still be grabbed
+function handle([x, y], pad = Math.min(24, 9 * ovScale())) {
+  return [Math.min(W - pad, Math.max(pad, x)), Math.min(H - pad, Math.max(pad, y))];
+}
 function centre(what) {
   const q = corners(what);
   return [(q[0][0] + q[2][0]) / 2, (q[0][1] + q[2][1]) / 2];
@@ -1349,34 +1423,39 @@ function inPoly([px, py], q) {
   }
   return inside;
 }
+// scale overlay handles proportionally to CSS display size so they stay crisp and grabbable on phones
+function ovScale() { return Math.max(1, W / (cv.getBoundingClientRect().width || W)); }
 // the round knob above the text block that turns it
 function rotKnob() {
   const q = state.textQuad;
   if (!q) return null;
+  const s = ovScale(), dist = Math.min(82, 34 * s);
   const mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
   const ex = q[1][0] - q[0][0], ey = q[1][1] - q[0][1], L = Math.hypot(ex, ey) || 1;
-  return { base: [mx, my], p: handle([mx + ey / L * 55, my - ex / L * 55]) };
+  return { base: [mx, my], p: handle([mx + ey / L * dist, my - ex / L * dist], Math.min(30, 12 * s)) };
 }
 function drawOverlay() {
   octx.clearRect(0, 0, W, H);
   const q = sel.what && corners(sel.what);
   if (!q) return;
+  const s = ovScale();
+  const lw = Math.min(6, 2.2 * s), hr = Math.min(20, 7.5 * s), kr = Math.min(26, 10.5 * s);
   if (sel.what === "text") {
     const k = rotKnob();
-    octx.lineWidth = 3; octx.strokeStyle = "#35c2ff";
+    octx.lineWidth = lw; octx.strokeStyle = "#35c2ff";
     octx.beginPath(); octx.moveTo(...k.base); octx.lineTo(...k.p); octx.stroke();
-    octx.beginPath(); octx.arc(k.p[0], k.p[1], 14, 0, Math.PI * 2);
+    octx.beginPath(); octx.arc(k.p[0], k.p[1], kr, 0, Math.PI * 2);
     octx.fillStyle = "#35c2ff"; octx.fill();
-    octx.fillStyle = "#fff"; octx.font = "bold 22px sans-serif"; octx.textAlign = "center"; octx.textBaseline = "middle";
+    octx.fillStyle = "#fff"; octx.font = `bold ${Math.round(kr * 1.45)}px sans-serif`; octx.textAlign = "center"; octx.textBaseline = "middle";
     octx.fillText("↻", k.p[0], k.p[1] + 1);
   }
-  octx.lineWidth = 3; octx.strokeStyle = "#35c2ff";
-  octx.setLineDash([10, 7]);
+  octx.lineWidth = lw; octx.strokeStyle = "#35c2ff";
+  octx.setLineDash([8 * s, 5 * s]);
   octx.beginPath(); q.forEach(([x, y], i) => i ? octx.lineTo(x, y) : octx.moveTo(x, y)); octx.closePath(); octx.stroke();
   octx.setLineDash([]);
   for (const c of q) {
     const [x, y] = handle(c);
-    octx.beginPath(); octx.arc(x, y, 10, 0, Math.PI * 2);
+    octx.beginPath(); octx.arc(x, y, hr, 0, Math.PI * 2);
     octx.fillStyle = "#fff"; octx.fill(); octx.stroke();
   }
 }
@@ -1388,12 +1467,12 @@ function pointerPos(e) {
 function onKnob(p) {
   if (sel.what !== "text") return false;
   const k = rotKnob();
-  return k && Math.hypot(k.p[0] - p[0], k.p[1] - p[1]) < 20 * W / cv.getBoundingClientRect().width;
+  return k && Math.hypot(k.p[0] - p[0], k.p[1] - p[1]) < 26 * ovScale();
 }
 function onHandle(p) {
   const q = sel.what && corners(sel.what);
   if (!q) return false;
-  const tol = 18 * W / cv.getBoundingClientRect().width;
+  const tol = 24 * ovScale();
   return q.find(c => { const [x, y] = handle(c); return Math.hypot(x - p[0], y - p[1]) < tol; }) || false;
 }
 // the resize arrow points along the corner's diagonal: ↖↘ for top-left and bottom-right, ↗↙ for the other two
@@ -1504,7 +1583,10 @@ function initDirect() {
     if (sel.what && e.target !== cv) { sel.what = null; drawOverlay(); }
   });
   // lifting a finger ends the gesture; the finger left on the glass does nothing until it lifts too
-  const stop = e => { fingers.delete(e.pointerId); drag = null; };
+  const stop = e => {
+    if (drag) pushUndo();
+    fingers.delete(e.pointerId); drag = null;
+  };
   cv.addEventListener("pointerup", stop);
   cv.addEventListener("pointercancel", stop);
   cv.addEventListener("wheel", e => {
@@ -1517,8 +1599,12 @@ function initDirect() {
     setSize(what, +sizeInput(what).value * (e.deltaY < 0 ? 1.05 : 1 / 1.05));
     redrawSoon();
   }, { passive: false });
-  cv.addEventListener("dblclick", e => { if (hit(pointerPos(e)) === "text") { $("ed").focus(); $("ed").select(); } });
+  // double-click the headline: open the 大字 tab and select the words to retype them
+  cv.addEventListener("dblclick", e => { if (hit(pointerPos(e)) === "text") { switchTab("text"); $("ed").focus(); $("ed").select(); } });
   document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+      e.preventDefault(); undo(); return;
+    }
     const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (e.key === "Escape") { sel.what = null; drawOverlay(); return; }
     if (!step || !sel.what || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
@@ -1530,7 +1616,87 @@ function initDirect() {
   $("resetPos").addEventListener("click", () => {
     state.tx = state.ty = state.pdx = state.pdy = state.bgx = state.bgy = state.brx = state.bry = 0;
     $("tsize").value = 100; $("brsize").value = 100; $("psize").value = 100; $("bsize").value = 100; $("trot").value = 0;
+    pushUndo();
     render();
+  });
+  $("undo").addEventListener("click", undo);
+}
+
+// ---------- undo history ----------
+const undoStack = [];
+function snapshot() {
+  return {
+    tpl: state.tpl, backdrop: state.backdrop, portrait: state.portrait, side: state.side,
+    tx: state.tx, ty: state.ty, pdx: state.pdx, pdy: state.pdy, bgx: state.bgx, bgy: state.bgy, brx: state.brx, bry: state.bry,
+    text: state.text, cols: state.cols.slice(),
+    tsize: $("tsize").value, brsize: $("brsize").value, psize: $("psize").value, bsize: $("bsize").value,
+    bblur: $("bblur").value, trot: $("trot").value,
+    brush: $("brush").checked, italic: $("italic").checked, brushFront: $("brushFront").checked,
+    flip: $("flip").checked, bgBlurFill: $("bgBlurFill").checked,
+  };
+}
+function sameSnap(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function syncUndoBtn() { $("undo").disabled = undoStack.length <= 1; }
+let typedAt = 0;                                       // when typing last took an undo step (0: something else did)
+function pushUndo() {
+  typedAt = 0;
+  const s = snapshot();
+  if (undoStack.length && sameSnap(undoStack[undoStack.length - 1], s)) return;
+  undoStack.push(s);
+  if (undoStack.length > 30) undoStack.shift();
+  syncUndoBtn();
+}
+// typing: keystrokes without a pause of a second or more make one undo step, taken
+// as they happen, so undoing a later drag never takes the typed words with it
+function pushTypedUndo() {
+  const t = Date.now();
+  if (t - typedAt < 1000 && undoStack.length > 1) undoStack.pop();
+  pushUndo(); typedAt = t;
+}
+function undo() {
+  if (undoStack.length <= 1) return;
+  typedAt = 0;
+  undoStack.pop();
+  const s = undoStack[undoStack.length - 1];
+  Object.assign(state, {
+    tpl: s.tpl, backdrop: s.backdrop, portrait: s.portrait, side: s.side,
+    tx: s.tx, ty: s.ty, pdx: s.pdx, pdy: s.pdy, bgx: s.bgx, bgy: s.bgy, brx: s.brx, bry: s.bry,
+  });
+  setText(s.text, s.cols.slice());
+  $("tsize").value = s.tsize; $("brsize").value = s.brsize; $("psize").value = s.psize;
+  $("bsize").value = s.bsize; $("bblur").value = s.bblur; $("trot").value = s.trot;
+  $("brush").checked = s.brush; $("italic").checked = s.italic; $("brushFront").checked = s.brushFront;
+  $("flip").checked = s.flip; $("bgBlurFill").checked = s.bgBlurFill;
+  syncTpl(); syncSide(); syncThumbs(); syncBgs(); syncUndoBtn();
+  ensureFonts(); render();
+}
+
+// ---------- tabs ----------
+function switchTab(name) {
+  document.querySelectorAll("#tabs button").forEach(b => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.querySelectorAll("[data-panel]").forEach(p => { p.hidden = p.dataset.panel !== name; });
+}
+function initTabs() {
+  $("tabs").addEventListener("click", e => {
+    const t = e.target.dataset && e.target.dataset.tab;
+    if (t) switchTab(t);
+  });
+}
+
+// ---------- on-demand WOFF2 chunk loading ----------
+let fontReqId = 0;
+function ensureFonts() {
+  if (!document.fonts || !document.fonts.load) return;
+  const id = ++fontReqId;
+  const sample = (state.text || "輪到你教") + "教";
+  document.fonts.load(`900 100px ${tplFont()}`, sample).then(() => {
+    if (id !== fontReqId) return;
+    cloudCache.clear();
+    redrawSoon();
   });
 }
 
@@ -1540,11 +1706,11 @@ function seg(id, key) {
   const sync = () => box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === state[key]));
   box.addEventListener("click", e => {
     const v = e.target.dataset && e.target.dataset.v;
-    if (!v) return;
+    if (!v || v === state[key]) return;
     const prev = state[key];
     state[key] = v;
     if (key === "tpl") applyTemplateDefaults(prev);
-    sync(); render();
+    sync(); pushUndo(); render();
   });
   sync();
   return sync;
@@ -1568,14 +1734,23 @@ function usePreset(tpl) {
   PRESET[tpl].forEach(([t, c], i) => { for (let j = 0; j < t.length + (i < PRESET[tpl].length - 1 ? 1 : 0); j++) cols.push(c); });
   setText(presetText(tpl), cols);
 }
+function portraitIdxByKey(key) { return PORTRAITS.findIndex(p => p.key === key); }
 function applyTemplateDefaults(prev) {
   // only swap the sample text if the user hasn't typed their own,
-  // and the background only if it is still the old template's own
+  // the background only if it is still the old template's own,
+  // and the portrait only if it is still the old template's own
   if (Object.keys(PRESET).some(k => presetText(k) === state.text)) usePreset(state.tpl);
   if (state.backdrop === TPL_BG[prev]) { state.backdrop = TPL_BG[state.tpl]; syncBgs(); }
+  const prevPi = portraitIdxByKey(TPL_PORTRAIT[prev]), nextPi = portraitIdxByKey(TPL_PORTRAIT[state.tpl]);
+  if (!state.custom && state.portrait === prevPi && nextPi >= 0) {
+    state.portrait = nextPi;
+    state.side = PORTRAITS[nextPi].side;
+    $("flip").checked = false;
+    state.pdx = state.pdy = 0; $("psize").value = 100;
+    syncThumbs(); syncSide();
+  }
   $("italic").checked = state.tpl === "crash";        // the crash covers lean; the others stand up
-  // 律師傳票 has its own letters: draw again once they have arrived
-  if (document.fonts && document.fonts.load) document.fonts.load(`900 100px ${tplFont()}`, "律師傳票教").then(render);
+  ensureFonts();
 }
 
 // ---------- headline box ----------
@@ -1609,7 +1784,7 @@ function initEditor() {
     const near = a > 0 && o[a - 1] !== "\n" ? state.cols[a - 1] : (state.cols[a] || state.cols[a - 1] || "white");
     state.cols = state.cols.slice(0, a).concat(Array(n.length - a - z).fill(near), state.cols.slice(o.length - z));
     state.text = n;
-    paintEditor(); render();
+    paintEditor(); render(); ensureFonts(); pushTypedUndo();
   });
   // the last selection made in the box: a phone may drop it once the box loses focus
   let sel = [0, 0];
@@ -1631,13 +1806,14 @@ function initEditor() {
     if (vv) { vv.addEventListener("resize", placeBar); vv.addEventListener("scroll", placeBar); }
   }
 
-  document.querySelectorAll(".colors button").forEach(b => {
+  document.querySelectorAll(".colors button[data-c]").forEach(b => {
     b.addEventListener("mousedown", e => e.preventDefault());   // keep the selection in the text box
     // on a touch screen the tap would take focus from the box (closing the keyboard
     // and the bar), so the colour is put on as the finger lands instead
     b.addEventListener("touchstart", e => { e.preventDefault(); paint(b.dataset.c); }, { passive: false });
     b.addEventListener("click", () => paint(b.dataset.c));
   });
+  $("kbDone").addEventListener("click", () => ed.blur());
   function paint(c) {
     {                                                   // colour the selection
       let [a, z] = document.activeElement === ed ? [ed.selectionStart, ed.selectionEnd] : sel;
@@ -1647,7 +1823,7 @@ function initEditor() {
         z = t.indexOf("\n", z); if (z < 0) z = t.length;
       }
       for (let i = a; i < z; i++) state.cols[i] = c;
-      paintEditor(); render();
+      paintEditor(); pushUndo(); render();
     }
   }
 }
@@ -1657,7 +1833,7 @@ function selectPortrait(i) {
   state.side = PORTRAITS[i].side;
   $("flip").checked = false;
   state.pdx = state.pdy = 0; $("psize").value = 100;
-  syncThumbs(); syncSide(); render();
+  syncThumbs(); syncSide(); pushUndo(); render();
 }
 function syncThumbs() {
   document.querySelectorAll("#thumbs button").forEach((b, i) =>
@@ -1686,7 +1862,7 @@ function initBackdrops() {
     b.dataset.v = key; b.title = label; b.setAttribute("aria-label", label);
     const c = document.createElement("canvas"); c.width = 160; c.height = 90;
     b.append(c);
-    b.addEventListener("click", () => { state.bg = null; $("bg").value = ""; state.backdrop = key; syncBgs(); setBgFit(false); });
+    b.addEventListener("click", () => { state.bg = null; $("bg").value = ""; state.backdrop = key; syncBgs(); pushUndo(); setBgFit(false); });
     $("bgs").append(b);
     return { key, c };
   });
@@ -1702,12 +1878,12 @@ function initBackdrops() {
   });
   for (const [key, src] of Object.entries(window.BRUSHES || {})) {
     const im = new Image();
-    im.onload = () => render();
+    im.onload = redrawSoon;
     im.src = src; brushImgs[key] = im;
   }
   for (const [key, src] of Object.entries(window.BACKGROUNDS || {})) {
     const im = new Image();
-    im.onload = () => { paintTiles(); render(); };
+    im.onload = () => { invalidateBgCache(); paintTiles(); redrawSoon(); };
     im.src = src; bgPhotos[key] = im;
   }
   paintTiles(); syncBgs();
@@ -1715,18 +1891,22 @@ function initBackdrops() {
 
 function say(t) { $("msg").textContent = t; clearTimeout(say.t); say.t = setTimeout(() => $("msg").textContent = "", 2500); }
 
-let syncSide;
+let syncSide, syncTpl;
 function init() {
+  initTabs();
   initEditor();
   usePreset("teach");
-  ["brush", "brushFront", "brsize", "tsize", "trot", "italic", "flip", "psize", "bsize", "bblur"].forEach(id => $(id).addEventListener("input", redrawSoon));
+  ["brush", "brushFront", "brsize", "tsize", "trot", "italic", "flip", "psize", "bsize", "bblur"].forEach(id => {
+    $(id).addEventListener("input", redrawSoon);
+    $(id).addEventListener("change", pushUndo);
+  });
   initDirect();
   initBackdrops();
-  seg("tpl", "tpl");
+  syncTpl = seg("tpl", "tpl");
   syncSide = seg("side", "side");
 
   PORTRAITS.forEach((p, i) => {
-    const im = new Image(); im.src = p.src; im.onload = render;
+    const im = new Image(); im.src = p.src; im.onload = redrawSoon;
     state.imgs[i] = im;
     const b = document.createElement("button");
     b.title = p.label;
@@ -1828,9 +2008,10 @@ function init() {
     if (MOBILE && !(ok && IOS)) openSheet(ok ? "已複製。貼不上的話，長按圖片，選「複製圖片」。" : "長按圖片，選「複製圖片」。");
   });
 
+  pushUndo();
   render();
-  // redraw once the heavy font is actually ready
-  if (document.fonts && document.fonts.load) document.fonts.load(`900 100px ${FONT}`, "輪到你教").then(render);   // 教 pulls in the ten-character file too
+  // redraw once the heavy font chunks for the initial text are ready
+  ensureFonts();
 }
 init();
 </script>
