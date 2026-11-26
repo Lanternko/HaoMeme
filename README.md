@@ -44,7 +44,7 @@ https://lanternko.github.io/HaoMeme/
   python tools/build_portraits.py  # 將 portraits/*.png 與 anchors.json 轉為 base64 WebP 打包進 portraits.js（需 pillow）
   python tools/build_backgrounds.py  # 從 src_photos/ 產生照片背景與紅色筆刷，打包成 backgrounds.js（需 pillow、numpy）
   ```
-  `cutout.py` 的原圖預設讀影片封面，`src_photos/` 放的是另外提供的照片（人像 J、K、L、藍霧燈條背景，以及「翻車了？」和「免談」的紅色筆刷都從這裡來）。「律師傳票」的人像 N、紅色筆刷、黑色塗抹和三條黃線，是照原封面請 Gemini 重畫成高解析度後放進 `src_photos/sue_*` 的（人像是綠幕版，去背後存成 `portraits/N.png`）。三個版型的照片背景也是照各自封面請 Gemini 拿掉人和字重畫的：灰色房間是 `sue_bg.jpg`，AI 教室是 `crash_bg.jpg`，舊教室是 `nope_bg.jpg`。
+  `cutout.py` 的原圖預設讀影片封面，`src_photos/` 放的是另外提供的照片（人像 J、K、L、藍霧燈條背景，以及「翻車了？」和「免談」的紅色筆刷都從這裡來）。「律師傳票」的人像 N、紅色筆刷、黑色塗抹和三條黃線，是照原封面請 Gemini 重畫成高解析度後放進 `src_photos/sue_*` 的（人像是綠幕版，去背後存成 `portraits/N.png`）。「翻車了？」的人像 O 也是照原封面請 Gemini 重畫成綠幕版（`src_photos/crash_person_green.jpg`），去背後存成 `portraits/O.png`。三個版型的照片背景也是照各自封面請 Gemini 拿掉人和字重畫的：灰色房間是 `sue_bg.jpg`，AI 教室是 `crash_bg.jpg`，舊教室是 `nope_bg.jpg`。
 - **字體來源與授權**：字體檔位於 `fonts/`，皆採用 SIL OFL（`fonts/OFL.txt`）授權：
   - 梗圖大字：**Glow Sans TC / SC Extended Heavy**（`GlowSansTC-Extended-Heavy.otf`，以及補齊繁體版缺字「告值真教清填慎鎮顛巔」10 字的 `GlowSansSC-Extended-Heavy-10.otf`），來源：https://github.com/welai/glow-sans
   - 「律師傳票」大字：同一家族的窄版 **Glow Sans TC / SC Condensed Heavy**（`GlowSansTC-Condensed-Heavy.otf`、補缺字的 `GlowSansSC-Condensed-Heavy-10.otf`），只在選到這個版型時才下載
