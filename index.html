@@ -151,7 +151,7 @@
   .thumbs button.on::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--accent);
     border-radius: inherit; pointer-events: none; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; }
-  .bgs { grid-template-columns: repeat(3, 1fr); }
+  .bgs { grid-template-columns: repeat(4, 1fr); }
   .bgs button { height: auto; aspect-ratio: 16 / 9; }
   .bgs canvas { height: 100%; }
   /* the last tile holds the uploaded picture; dashed with a clear + icon while empty */
@@ -418,11 +418,23 @@ function setBgFit(fit) {
 }
 
 // built-in backgrounds; each template starts on its own one
-const BACKDROPS = [["red", "紅光"], ["classroom", "AI 教室"], ["smoke", "藍霧燈條"], ["oldClassroom", "舊教室"], ["room", "灰色房間"]];
+// the four templates' own backdrops first, in template order, then the plain ones
+const BACKDROPS = [["red", "紅光"], ["classroom", "AI 教室"], ["oldClassroom", "舊教室"], ["room", "灰色房間"],
+                   ["grey", "灰牆"], ["dark", "暗色"], ["smoke", "藍霧燈條"]];
 const TPL_BG = { teach: "red", crash: "classroom", nope: "oldClassroom", sue: "room" };   // each the backdrop of its own cover
 const TPL_PORTRAIT = { teach: "A", crash: "C", nope: "F", sue: "N" };
 const bgPhotos = {};                                   // photo backgrounds from backgrounds.js, by key
 const brushImgs = {};                                  // painted strokes from backgrounds.js, by template
+
+// a soft round light, squashed to rx x ry (gradients only: Safari has no canvas blur)
+function glow(g, x, y, rx, ry, rgb, a) {
+  g.save();
+  g.translate(x, y); g.scale(1, ry / rx);
+  const b = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  b.addColorStop(0, `rgba(${rgb},${a})`); b.addColorStop(.5, `rgba(${rgb},${a * .45})`); b.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = b; g.fillRect(-rx, -rx, rx * 2, rx * 2);
+  g.restore();
+}
 
 function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
   if (kind === "red") {
@@ -431,6 +443,30 @@ function paintBackdrop(g, kind, personCx) {           // drawn in a W x H space
     b.addColorStop(0, "#ff1616"); b.addColorStop(.28, "#d40b10"); b.addColorStop(.55, "#6a0508");
     b.addColorStop(.8, "#1c0a0b"); b.addColorStop(1, "#0b0b0c");
     g.fillStyle = b; g.fillRect(0, 0, W, H);
+  } else if (kind === "grey") {
+    const b = g.createLinearGradient(0, 0, W, H);
+    b.addColorStop(0, "#5e6f7f"); b.addColorStop(.48, "#25313e"); b.addColorStop(1, "#0a0f15");
+    g.fillStyle = b; g.fillRect(0, 0, W, H);
+    // subtle cool studio/screen glow on the right + soft out-of-focus room bokeh
+    glow(g, 1060, 180, 420, 260, "74,148,230", .26);
+    glow(g, 220, 140, 340, 240, "190,210,230", .16);
+    const r = rng(7);
+    for (let i = 0; i < 16; i++) {
+      const x = r() * W, y = r() * H, rad = 60 + r() * 160;
+      const c = g.createRadialGradient(x, y, 0, x, y, rad);
+      c.addColorStop(0, `rgba(${150 + r() * 80},${180 + r() * 60},255,${.05 + r() * .09})`);
+      c.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = c; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+  } else if (kind === "dark") {
+    // a dim room far out of focus: warm window light top left, bright doorway
+    // top right, and darkest in the middle where the headline goes
+    g.fillStyle = "#120f0c"; g.fillRect(0, 0, W, H);
+    glow(g, 110, 80, 360, 250, "205,184,152", .56);
+    glow(g, 1140, 115, 165, 310, "236,228,214", .58);
+    glow(g, 1110, 640, 360, 170, "118,96,74", .48);
+    glow(g, 60, 620, 260, 200, "86,74,62", .5);
+    glow(g, 760, 360, 560, 340, "0,0,0", .9);
   } else {
     const im = bgPhotos[kind];
     g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
