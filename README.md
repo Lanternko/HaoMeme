@@ -29,7 +29,7 @@ https://lanternko.github.io/HaoMeme/
 
 ## 授權
 
-- **程式碼**：MIT 授權（見 [`LICENSE`](LICENSE)），可以自由使用、修改、轉發，保留版權聲明即可。
+- **程式碼**：MIT 授權（見 [`LICENSE`](LICENSE)；範圍見 [`NOTICE.md`](NOTICE.md)），可以自由使用、修改、轉發，保留版權聲明即可。
 - **圖片不在 MIT 範圍內**：`portraits/`、`portraits_orig/`、`src_photos/`、`src_thumbs/` 裡的人像與截圖、`portraits.js` 和 `backgrounds.js` 內嵌的圖片資料，以及用它們做的截圖與圖示，版權與肖像權屬原作者（YouTube 頻道「拆書人」）。放在這裡只是為了讓工具能用，fork 或轉用時請自行換掉或取得授權。
 - **字型**：`fonts/` 依各自作者的 SIL OFL 1.1 授權（見 `fonts/OFL.txt`）。
 
