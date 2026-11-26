@@ -1710,6 +1710,7 @@ function seg(id, key) {
     const prev = state[key];
     state[key] = v;
     if (key === "tpl") applyTemplateDefaults(prev);
+    if (key === "side") mirrorForSide();
     sync(); pushUndo(); render();
   });
   sync();
@@ -1826,6 +1827,15 @@ function initEditor() {
       paintEditor(); pushUndo(); render();
     }
   }
+}
+
+// Moving a built-in portrait to the other side mirrors it, so the person still looks
+// and gestures toward the words. Not the hoodie (J): its logo would read backwards.
+// An uploaded photo is left as it is (it may have writing on it); 翻轉 is there for it.
+const KEEP_UNFLIPPED = new Set(["J"]);
+function mirrorForSide() {
+  if (state.custom || KEEP_UNFLIPPED.has(PORTRAITS[state.portrait]?.key)) return;
+  $("flip").checked = !$("flip").checked;
 }
 
 function selectPortrait(i) {
